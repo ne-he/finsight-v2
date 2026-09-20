@@ -7,30 +7,34 @@
  *
  * Validating on import means a missing key fails the request with a clear
  * message instead of surfacing later as an unexplained 401 from a provider.
+ *
+ * Every value is trimmed. A key pasted into a dotenv file very often carries a
+ * stray leading space, and an untrimmed one fails as a 401 from the provider
+ * rather than as anything that points at the real cause.
  */
 import { z } from "zod";
 
 const schema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  NEXT_PUBLIC_SUPABASE_URL: z.string().trim().url(),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().trim().min(1),
 
   /** Bypasses Row Level Security. Never expose this to the browser. */
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().trim().min(1),
 
-  GEMINI_API_KEY: z.string().min(1),
+  GEMINI_API_KEY: z.string().trim().min(1),
 
   /**
    * SEC EDGAR rejects requests without a descriptive User-Agent carrying
    * contact details. This is a published requirement, not an optional nicety.
    */
-  EDGAR_USER_AGENT: z.string().min(5),
+  EDGAR_USER_AGENT: z.string().trim().min(5),
 
   /** Questions per user per day, and across all users per day. */
   DAILY_LIMIT_PER_USER: z.coerce.number().int().positive().default(40),
   DAILY_LIMIT_GLOBAL: z.coerce.number().int().positive().default(400),
 
   /** Shared secret for the scheduled keep-alive call. */
-  CRON_SECRET: z.string().min(8).optional(),
+  CRON_SECRET: z.string().trim().min(8).optional(),
 });
 
 let cached: z.infer<typeof schema> | null = null;
