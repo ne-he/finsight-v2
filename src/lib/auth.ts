@@ -41,17 +41,34 @@ export async function currentViewer(): Promise<Viewer | null> {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile) {
-    await admin
-      .from("fs_profiles")
-      .upsert({ id: user.id, email: user.email ?? null }, { onConflict: "id" });
+  if (profile) {
+    return {
+      id: user.id,
+      email: user.email ?? null,
+      role: profile.role === "admin" ? "admin" : "user",
+    };
+  }
+
+  // First sight of this account. Creating the profile and deciding its role
+  // happen inside one database function, because the rule "the first account
+  // becomes the administrator" is only correct if two simultaneous sign-ups
+  // cannot both read "no admin exists". See migration 0005.
+  const { data: role, error: profileError } = await admin.rpc("fs_ensure_profile", {
+    p_id: user.id,
+    p_email: user.email ?? null,
+  });
+
+  if (profileError) {
+    // A failed profile write must not lock the user out of reading. Fall back
+    // to the least privileged role rather than to an error page.
+    console.error("[auth] could not ensure profile", profileError);
     return { id: user.id, email: user.email ?? null, role: "user" };
   }
 
   return {
     id: user.id,
     email: user.email ?? null,
-    role: profile.role === "admin" ? "admin" : "user",
+    role: role === "admin" ? "admin" : "user",
   };
 }
 
