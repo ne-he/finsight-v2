@@ -143,6 +143,28 @@ async function main() {
     }
   }
 
+  section("Profile bootstrap (migration 0005)");
+  {
+    // Called with a uuid that owns no auth.users row, so a foreign key error
+    // means the function is present and correctly wired.
+    const { error } = await admin.rpc("fs_ensure_profile", {
+      p_id: "00000000-0000-0000-0000-000000000000",
+      p_email: null,
+    });
+    if (error && /does not exist|could not find/i.test(error.message)) {
+      warn(
+        "fs_ensure_profile()",
+        "migration 0005 not applied, the app falls back to a racy in-app bootstrap",
+      );
+    } else if (error && /foreign key|violates/i.test(error.message)) {
+      pass("fs_ensure_profile()", "exists and enforces the user foreign key");
+    } else if (error) {
+      warn("fs_ensure_profile()", error.message);
+    } else {
+      warn("fs_ensure_profile()", "accepted an unknown user id");
+    }
+  }
+
   section("Row Level Security (migration 0002)");
   {
     // The anon key ships to every browser, so these reads must return nothing.

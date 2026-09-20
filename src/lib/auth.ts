@@ -59,6 +59,15 @@ export async function currentViewer(): Promise<Viewer | null> {
   });
 
   if (profileError) {
+    if (/does not exist|could not find/i.test(profileError.message)) {
+      // Migration 0005 has not been applied. Without a fallback the very first
+      // user would silently become an ordinary account, and nobody could ever
+      // ingest anything: the role is not writable from the browser, so the app
+      // would be permanently stuck. Do the same thing in application code,
+      // accepting the race that the database function exists to avoid.
+      console.warn("[auth] fs_ensure_profile is missing, applying migration 0005 is recommended");
+      return bootstrapProfileInApp(admin, user.id, user.email ?? null);
+    }
     // A failed profile write must not lock the user out of reading. Fall back
     // to the least privileged role rather than to an error page.
     console.error("[auth] could not ensure profile", profileError);
@@ -70,6 +79,28 @@ export async function currentViewer(): Promise<Viewer | null> {
     email: user.email ?? null,
     role: role === "admin" ? "admin" : "user",
   };
+}
+
+/**
+ * The same first-account-becomes-admin rule, without the database function.
+ *
+ * Only reached when migration 0005 has not been applied. Two simultaneous first
+ * sign-ups could both read "no admin exists" and both be promoted, which is
+ * exactly why the real implementation is a locked function in SQL.
+ */
+async function bootstrapProfileInApp(
+  admin: ReturnType<typeof supabaseAdmin>,
+  id: string,
+  email: string | null,
+): Promise<Viewer> {
+  const { count } = await admin
+    .from("fs_profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "admin");
+
+  const role: Viewer["role"] = (count ?? 0) === 0 ? "admin" : "user";
+  await admin.from("fs_profiles").upsert({ id, email, role }, { onConflict: "id" });
+  return { id, email, role };
 }
 
 export async function requireViewer(): Promise<Viewer> {
