@@ -1,0 +1,112 @@
+[
+  {
+    "id": "nvda-risk",
+    "question": "What are NVIDIA's main risk factors?",
+    "type": "factual",
+    "expected": ["NVDA"]
+  },
+  {
+    "id": "nvda-datacenter",
+    "question": "What does NVIDIA say about data center revenue and demand?",
+    "type": "factual",
+    "expected": ["NVDA"]
+  },
+  {
+    "id": "nvda-business",
+    "question": "What is NVIDIA's business and what does it sell?",
+    "type": "factual",
+    "expected": ["NVDA"]
+  },
+  {
+    "id": "nvda-competition",
+    "question": "How does NVIDIA describe competition in its markets?",
+    "type": "factual",
+    "expected": ["NVDA"]
+  },
+  {
+    "id": "nvda-cyber",
+    "question": "How does NVIDIA approach cybersecurity risk management?",
+    "type": "factual",
+    "expected": ["NVDA"]
+  },
+  {
+    "id": "nvda-supply",
+    "question": "What does NVIDIA disclose about supply chain and manufacturing dependencies?",
+    "type": "factual",
+    "expected": ["NVDA"]
+  },
+  {
+    "id": "aapl-risk",
+    "question": "What are the key risk factors Apple discloses?",
+    "type": "factual",
+    "expected": ["AAPL"]
+  },
+  {
+    "id": "aapl-segments",
+    "question": "How does Apple describe its products and revenue segments?",
+    "type": "factual",
+    "expected": ["AAPL"]
+  },
+  {
+    "id": "aapl-mdna",
+    "question": "What does Apple's MD&A say about its net sales?",
+    "type": "factual",
+    "expected": ["AAPL"]
+  },
+  {
+    "id": "aapl-legal",
+    "question": "What does Apple disclose about legal proceedings?",
+    "type": "factual",
+    "expected": ["AAPL"]
+  },
+  {
+    "id": "cmp-risk-nvda-aapl",
+    "question": "Compare the risk factors of NVIDIA and Apple.",
+    "type": "comparison",
+    "expected": ["NVDA", "AAPL"]
+  },
+  {
+    "id": "cmp-revenue-nvda-aapl",
+    "question": "Compare the revenue drivers of NVIDIA and Apple.",
+    "type": "comparison",
+    "expected": ["NVDA", "AAPL"]
+  },
+  {
+    "id": "id-nvda-risk",
+    "question": "Apa saja risiko utama yang diungkapkan NVIDIA dalam laporan tahunannya?",
+    "type": "factual",
+    "expected": ["NVDA"],
+    "note": "Indonesian phrasing of a question the corpus answers in English. Tests whether a cross-language query still routes to the right filing."
+  },
+  {
+    "id": "id-aapl-segments",
+    "question": "Bagaimana Apple menjelaskan segmen produk dan pendapatannya?",
+    "type": "factual",
+    "expected": ["AAPL"],
+    "note": "Indonesian phrasing, see id-nvda-risk."
+  },
+  {
+    "id": "oos-swallow",
+    "question": "What is the airspeed velocity of an unladen swallow?",
+    "type": "out-of-scope",
+    "expected": []
+  },
+  {
+    "id": "oos-weather",
+    "question": "What will the weather be in Jakarta tomorrow?",
+    "type": "out-of-scope",
+    "expected": []
+  },
+  {
+    "id": "oos-stockprice",
+    "question": "What is Tesla's stock price right now?",
+    "type": "out-of-scope",
+    "expected": []
+  },
+  {
+    "id": "oos-recipe",
+    "question": "Give me a recipe for nasi goreng.",
+    "type": "out-of-scope",
+    "expected": []
+  }
+]
