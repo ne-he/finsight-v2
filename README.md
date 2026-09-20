@@ -9,11 +9,9 @@ v2 is a rewrite of [the original Python system](https://github.com/ne-he/RAG_bus
 as a single Next.js application on Vercel, with Supabase for authentication,
 conversation history and vector search.
 
-> **Status: in development.** The retrieval core, the database schema, the API
-> routes and the test suite are in place and the project builds. There is no
-> user interface yet, nothing has been deployed, and none of the quality
-> metrics have been measured on this implementation. See
-> [What is not done yet](#what-is-not-done-yet).
+> **Status: working locally, not deployed.** Sign in, ask, history and admin
+> ingest all run against a live database. Retrieval quality is measured on this
+> implementation, not inherited. See [What is not done yet](#what-is-not-done-yet).
 
 ---
 
@@ -26,9 +24,42 @@ conversation history and vector search.
 | Retrieval | One vector search | Hybrid vector plus full-text, fused with RRF |
 | Targeting | One global search | Company and fiscal year filters applied inside the ranking |
 | Citations | None, or invented | Exact: `[NVDA FY2026 * Item 1A. Risk Factors]` plus source URL |
-| Hallucination control | Hope | A confidence gate that refuses below a measured threshold |
+| Hallucination control | Hope | A confidence gate tuned from measured data |
 | When the model is down | An error, or silence | A degraded answer quoted from the retrieved passages |
 | Quality | "Looks fine" | An eval harness over a golden set |
+
+---
+
+## Measured results
+
+Corpus: NVDA FY2026 and AAPL FY2025, 582 chunks. Golden set of 18 questions,
+`gemini-embedding-001` at 768 dimensions, k = 6. Run with `npm run eval`, full
+report in [`evals/results/`](evals/results).
+
+| Metric | Result | What it shows |
+|---|---|---|
+| Retrieval hit-rate@6 | **13/14** | The right company's filing reaches the top 6 |
+| Out-of-scope gate accuracy | **4/4** | Unanswerable questions are refused, not guessed |
+| False refusals | **0** | The gate never blocked a question the corpus could answer |
+| Mean top cosine | **0.765** | Healthy distance above the 0.68 gate |
+| Answerable cosine range | 0.722 to 0.808 | |
+| Out-of-scope cosine range | 0.472 to 0.612 | A clean gap of 0.110 |
+
+The threshold is chosen from that gap rather than guessed, and this run
+confirms 0.68 still sits inside it on the new retriever.
+
+**The one miss is worth naming.** `Compare the revenue drivers of NVIDIA and
+Apple` retrieved only NVIDIA. Comparison questions have to win slots for two
+companies inside one top 6, and they are the first thing to break whenever
+retrieval is tuned. The same question class was what failed in v1 when chunk
+overlap was changed, so it stays in the golden set as an early warning.
+
+Cross-language retrieval is also measured, not asserted: two questions written
+in Indonesian both routed to the correct filing, and the answer comes back in
+Indonesian with English citations intact.
+
+Answer faithfulness is not measured yet. Judging it needs generation quota the
+free tier does not have in one sitting.
 
 ---
 
@@ -80,6 +111,9 @@ The admin page calls `/api/admin/ingest/step` in a loop until the job reports
 needs no cron frequency guarantee from the hosting plan, it gives the operator
 a live progress bar, and closing the tab pauses the job instead of losing it.
 
+Measured on real filings: NVIDIA FY2026 produced 362 chunks in 404 seconds,
+Apple FY2025 produced 220 chunks in 237 seconds.
+
 ---
 
 ## Stack
@@ -104,20 +138,27 @@ cp .env.example .env.local     # then fill in the values
 ```
 
 Apply the SQL in `supabase/migrations/` in order, through the Supabase SQL
-editor. Then:
+editor. Then check the setup before trusting it:
 
 ```bash
+npm run verify     # tables, policies, functions, credentials, neighbours
 npm run dev        # http://localhost:3000
-npm test           # unit tests, no network needed
-npm run typecheck
-npm run build
 ```
 
-Promote your account to administrator once, after signing up:
+The first account to sign up becomes the administrator, so a fresh deployment
+is usable without opening the SQL editor. Every later account is an ordinary
+user; `npm run promote -- someone@example.com` changes that.
 
-```sql
-update fs_profiles set role = 'admin' where email = 'you@example.com';
-```
+### Everyday commands
+
+| Command | What it does |
+|---|---|
+| `npm run verify` | Reports whether the environment and database are ready |
+| `npm run inspect -- NVDA` | Parses a real filing and reports sections and chunks, no quota spent |
+| `npm run ingest -- NVDA AAPL` | Ingests from the command line, useful for seeding |
+| `npm run eval -- --write` | Measures retrieval and writes a dated report |
+| `npm test` | Unit tests, offline |
+| `npm run typecheck` / `npm run lint` / `npm run build` | The checks CI runs |
 
 ---
 
@@ -131,7 +172,7 @@ src/
     env.ts               validated server environment
     gemini.ts            embeddings and streaming generation over REST
     sse.ts               incremental SSE decoder, and the encoder for our own stream
-    auth.ts              who is calling, and whether they may
+    auth.ts · guards.ts  who is calling, and whether they may
     ingest.ts            the ingest state machine
     supabase/            browser, user-session and service-role clients
     rag/
@@ -141,8 +182,11 @@ src/
       filters.ts         which company and year a question is about
       prompt.ts          system prompt, context wrapping, degraded answer
       retrieve.ts        hybrid search and the confidence gate
-  app/api/               chat, health, keep-alive, admin ingest
-supabase/migrations/     schema, RLS policies, search function, rate limit
+  app/                   pages, and api/ for chat, health, keep-alive, admin, feedback
+  components/            nav, auth form, chat view, ingest panel
+supabase/migrations/     schema, RLS policies, search function, rate limit, bootstrap
+scripts/                 verify, inspect, ingest, eval, promote
+evals/                   golden set and dated result reports
 tests/                   Vitest, offline
 docs/ARCHITECTURE.md     decisions and trade-offs
 ```
@@ -154,14 +198,15 @@ docs/ARCHITECTURE.md     decisions and trade-offs
 Listed rather than implied, because a README that reads as finished when the
 project is not is the easiest kind of documentation to get wrong.
 
-- **No user interface.** Sign in, chat, history and the admin page are not built.
-- **Not deployed.** No Supabase project provisioned, no Vercel project linked.
-- **No measured quality.** `CONFIDENCE_THRESHOLD` is inherited from v1, where it
-  was tuned against a BM25 retriever. v2 ranks with Postgres full-text search
-  instead, so the threshold and every retrieval metric have to be measured
-  again before they can be quoted. The eval harness is not written.
+- **Not deployed.** No Vercel project is linked, so there is no public URL.
+- **Answer faithfulness is unmeasured.** Retrieval is; generation quality is not.
+- **One comparison question misses.** See [Measured results](#measured-results).
 - **No integration tests** against a live database. Unit tests cover the pure
-  logic only.
+  logic; the database path is covered by `npm run verify` and the eval harness,
+  which are run deliberately rather than in CI.
+- **Prompt injection is unmitigated.** Filing text from SEC is placed in the
+  model's context. That is a low-risk source, but the system prompt is not a
+  security boundary.
 
 ---
 

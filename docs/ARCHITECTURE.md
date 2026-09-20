@@ -114,9 +114,19 @@ over-fetched result could still come back with fewer than k usable rows.
 3. Ranking logic in SQL is harder to unit test than a TypeScript function. It
    is covered by the eval harness and by integration tests, not by Vitest.
 
-**Therefore:** `CONFIDENCE_THRESHOLD = 0.68` is inherited, not established.
-Until the eval harness runs against this retriever, no metric from v1 may be
-quoted for v2.
+**Therefore:** `CONFIDENCE_THRESHOLD = 0.68` was inherited, not established,
+and no v1 metric was allowed to stand for v2 until it had been re-measured.
+
+**Measured, 20 September 2026** (NVDA FY2026 and AAPL FY2025, 582 chunks, 18
+questions): hit-rate@6 13/14, gate accuracy 4/4, no false refusals, mean top
+cosine 0.765. Answerable questions scored 0.722 to 0.808 and out-of-scope ones
+0.472 to 0.612, a clean gap of 0.110, so 0.68 still sits inside the separation
+on the new retriever. The inherited number survived, but it is now a result
+rather than an assumption.
+
+The single miss is a comparison question that retrieved only one of the two
+companies. That class is the first to break when retrieval is tuned, which is
+why it stays in the golden set.
 
 ---
 
@@ -185,8 +195,9 @@ then nothing, forever, with no error anywhere.
 | Vercel Hobby function ceiling `[?]` | Decides whether 30 seconds can be raised | Read the plan limits page, or test a long response |
 | Vercel Hobby cron frequency `[?]` | Decides whether ingest could ever be scheduled | Same |
 | Supabase free storage headroom `[?]` | Filing text plus chunks plus cache adds up | Check the project dashboard after the first ingest |
-| Does `hnsw` build on this Postgres version `[?]` | Falls back to `ivfflat` if not | Run migration 0001 and read the error |
-| Indonesian question quality | Claimed as a feature, not yet measured | Add Indonesian questions to the golden set |
+| ~~Does `hnsw` build on this Postgres version~~ | Resolved 20 Sep: migration 0001 applied cleanly | |
+| ~~Indonesian question quality~~ | Resolved 20 Sep: two Indonesian questions are in the golden set and both route correctly, and answers come back in Indonesian with English citations | |
+| Answer faithfulness | Retrieval is measured, generation is not | Needs an LLM judge and more generation quota than one day allows |
 
 ---
 
