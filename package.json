@@ -10,8 +10,9 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "eval": "tsx scripts/run-eval.ts",
-    "ingest": "tsx scripts/ingest.ts"
+    "verify": "tsx scripts/verify-setup.ts",
+    "inspect": "tsx scripts/inspect-filing.ts",
+    "promote": "tsx scripts/promote-admin.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
