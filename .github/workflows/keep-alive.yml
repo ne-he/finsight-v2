@@ -1,0 +1,26 @@
+name: Keep Supabase awake
+
+# Backup for the Vercel cron. The Supabase free tier pauses a project after
+# roughly seven days of no database activity, and a paused database makes every
+# question fail. Two independent schedulers is cheap insurance for that.
+on:
+  schedule:
+    - cron: "0 7 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Touch the database through the app
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ]; then
+            echo "APP_URL secret is not set yet, skipping."
+            exit 0
+          fi
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/keep-alive"
