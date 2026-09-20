@@ -72,7 +72,7 @@ async function setJob(
 export async function startIngest(
   admin: SupabaseClient,
   ticker: string,
-  userId: string,
+  userId: string | null,
   userAgent: string,
 ): Promise<JobProgress> {
   const normalised = ticker.trim().toUpperCase();

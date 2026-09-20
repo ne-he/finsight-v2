@@ -11,6 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify": "tsx scripts/verify-setup.ts",
+    "ingest": "tsx scripts/ingest.ts",
+    "eval": "tsx scripts/run-eval.ts",
     "inspect": "tsx scripts/inspect-filing.ts",
     "promote": "tsx scripts/promote-admin.ts"
   },
