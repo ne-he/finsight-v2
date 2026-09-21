@@ -11,6 +11,7 @@ import { CONFIDENCE_THRESHOLD, FINAL_K, RRF_K, TOP_K_DENSE, TOP_K_SPARSE } from 
 import { embed } from "@/lib/gemini";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { balanceAcross, perListQuota } from "./balance";
 import { detectFilters, isOverConstrained, type FilingRef } from "./filters";
 
 export interface RetrievedChunk {
@@ -74,24 +75,24 @@ export async function retrieve(
     ? { tickers: [], years: [] }
     : detected;
 
-  const queryEmbedding = await embed(query);
+  // pgvector accepts its text form, and JSON.stringify of a number array is
+  // exactly that form. One embedding serves every search below.
+  const vector = JSON.stringify(await embed(query));
 
-  const { data, error } = await client.rpc("fs_match_chunks", {
-    // pgvector accepts its text form, and JSON.stringify of a number array is
-    // exactly that form.
-    query_embedding: JSON.stringify(queryEmbedding),
-    query_text: query,
-    filter_tickers: filters.tickers,
-    filter_years: filters.years,
-    k_dense: TOP_K_DENSE,
-    k_sparse: TOP_K_SPARSE,
-    rrf_k: RRF_K,
-    final_k: FINAL_K,
-  });
-
-  if (error) throw new Error(`fs_match_chunks failed: ${error.message}`);
-
-  const rows = (data ?? []) as MatchRow[];
+  let rows: MatchRow[];
+  if (filters.tickers.length > 1) {
+    // A comparison. Search each company on its own so neither can crowd the
+    // other out of the context, then interleave. See balance.ts.
+    const quota = perListQuota(filters.tickers.length, FINAL_K);
+    const lists = await Promise.all(
+      filters.tickers.map((ticker) =>
+        matchChunks(client, vector, query, [ticker], filters.years, quota),
+      ),
+    );
+    rows = balanceAcross(lists, FINAL_K);
+  } else {
+    rows = await matchChunks(client, vector, query, filters.tickers, filters.years, FINAL_K);
+  }
   const chunks: RetrievedChunk[] = rows.map((row) => ({
     chunkId: row.chunk_id,
     content: row.content,
@@ -104,8 +105,9 @@ export async function retrieve(
   }));
 
   // The gate reads the best DENSE cosine, computed before fusion, so it stays
-  // comparable to the measurement that chose the threshold.
-  const topCosine = rows.length > 0 ? Number(rows[0].top_cosine ?? 0) : 0;
+  // comparable to the measurement that chose the threshold. In a comparison
+  // each search reports its own, and the best of them is the one that counts.
+  const topCosine = rows.reduce((best, row) => Math.max(best, Number(row.top_cosine ?? 0)), 0);
 
   return {
     chunks,
@@ -115,26 +117,62 @@ export async function retrieve(
   };
 }
 
-/** One entry per cited section, for the sources list shown under an answer. */
-export function sourcesOf(chunks: RetrievedChunk[]) {
-  const seen = new Map<string, {
-    ticker: string;
-    fiscalYear: string;
-    section: string;
-    sourceUrl: string;
-    score: number;
-  }>();
+async function matchChunks(
+  client: SupabaseClient,
+  vector: string,
+  query: string,
+  tickers: string[],
+  years: string[],
+  finalK: number,
+): Promise<MatchRow[]> {
+  const { data, error } = await client.rpc("fs_match_chunks", {
+    query_embedding: vector,
+    query_text: query,
+    filter_tickers: tickers,
+    filter_years: years,
+    k_dense: TOP_K_DENSE,
+    k_sparse: TOP_K_SPARSE,
+    rrf_k: RRF_K,
+    final_k: finalK,
+  });
+
+  if (error) throw new Error(`fs_match_chunks failed: ${error.message}`);
+  return (data ?? []) as MatchRow[];
+}
+
+export interface SourceRef {
+  ticker: string;
+  fiscalYear: string;
+  section: string;
+  sourceUrl: string;
+  score: number;
+  /**
+   * The retrieved passages from this section, exactly as the model read them.
+   * Shipping them to the page is what lets a reader check a citation against
+   * the words it came from, instead of against a 300-page filing.
+   */
+  passages: string[];
+}
+
+/** One entry per cited section, in retrieval order, with its passages. */
+export function sourcesOf(chunks: RetrievedChunk[]): SourceRef[] {
+  const seen = new Map<string, SourceRef>();
 
   for (const chunk of chunks) {
     const key = `${chunk.ticker}|${chunk.fiscalYear}|${chunk.section}`;
+    const score = Math.round(chunk.similarity * 10000) / 10000;
     const existing = seen.get(key);
-    if (!existing || chunk.similarity > existing.score) {
+    if (existing) {
+      existing.score = Math.max(existing.score, score);
+      existing.passages.push(chunk.content);
+    } else {
       seen.set(key, {
         ticker: chunk.ticker,
         fiscalYear: chunk.fiscalYear,
         section: chunk.section,
         sourceUrl: chunk.sourceUrl,
-        score: Math.round(chunk.similarity * 10000) / 10000,
+        score,
+        passages: [chunk.content],
       });
     }
   }
