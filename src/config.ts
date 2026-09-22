@@ -49,11 +49,14 @@ export const RRF_K = 60;
  * Below this cosine the retrieved context is treated as not covering the
  * question, and the answer becomes an honest refusal instead of a guess.
  *
- * v1 measured legitimate questions at 0.72 to 0.80 and out-of-scope ones at
- * 0.55 to 0.63, and picked the midpoint of that gap. v2 inherits the number but
- * NOT the evidence: re-run the eval harness before treating it as tuned.
+ * Chosen as the midpoint of the measured gap, never guessed. v1 used 0.68.
+ * With three filings (21 Sep 2026) answerable questions scored 0.707 to 0.815
+ * and out-of-scope ones 0.472 to 0.612; the lowest answerable score was a
+ * three-way comparison, only 0.027 above 0.68. The midpoint, 0.66, leaves a
+ * similar margin on both sides. Re-run `npm run eval` after any change to
+ * the corpus or the retriever before trusting this number again.
  */
-export const CONFIDENCE_THRESHOLD = 0.68;
+export const CONFIDENCE_THRESHOLD = 0.66;
 
 /** Payload guards. A genuine session stays far below all three. */
 export const MAX_MESSAGES = 40;
