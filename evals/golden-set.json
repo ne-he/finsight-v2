@@ -86,6 +86,30 @@
     "note": "Indonesian phrasing, see id-nvda-risk."
   },
   {
+    "id": "msft-segments",
+    "question": "What are Microsoft's reportable segments?",
+    "type": "factual",
+    "expected": ["MSFT"]
+  },
+  {
+    "id": "msft-risk",
+    "question": "What risks does Microsoft describe around AI and cloud infrastructure?",
+    "type": "factual",
+    "expected": ["MSFT"]
+  },
+  {
+    "id": "cmp-cloud-msft-aapl",
+    "question": "How do Microsoft and Apple describe competition in their businesses?",
+    "type": "comparison",
+    "expected": ["MSFT", "AAPL"]
+  },
+  {
+    "id": "cmp-three-way",
+    "question": "Compare the main risk factors of NVIDIA, Apple and Microsoft.",
+    "type": "comparison",
+    "expected": ["NVDA", "AAPL", "MSFT"]
+  },
+  {
     "id": "oos-swallow",
     "question": "What is the airspeed velocity of an unladen swallow?",
     "type": "out-of-scope",
