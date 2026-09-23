@@ -15,8 +15,8 @@ the obvious free options each carry an unresolved question about payment
 details or plan limits.
 
 The Next.js rewrite removes the question entirely. Vercel already hosts a
-sibling project on this account, with a working daily cron and a 30 second
-function ceiling proven in production.
+sibling project on this account, with a working daily cron and a function
+ceiling proven in production.
 
 **Cost, stated plainly.** Every line of the retrieval engine is rewritten, and
 every number v1 measured stops being evidence for v2. That is not a formality:
@@ -81,10 +81,11 @@ Stages are split so the slowest and least predictable part, a multi-megabyte
 download from a third party, owns a request by itself.
 
 **Who drives the loop:** the admin's browser. A scheduler was rejected because
-cron frequency on the free plan is `[?]` unverified, and a once-daily tick
-would make a single ingest take weeks. The browser loop needs no guarantee from
-the platform, shows real progress, and a closed tab pauses the job rather than
-losing it.
+the Hobby plan allows a cron job at most once a day, with an hour of timing
+slack (verified against Vercel's cron pricing page on 23 Sep 2026), so a
+once-daily tick would make a single ingest take weeks. The browser loop needs
+no guarantee from the platform, shows real progress, and a closed tab pauses
+the job rather than losing it.
 
 **Why chunks are inserted with a null embedding:** a partly finished job then
 leaves rows that are visibly not ready, and search skips them. The alternative,
@@ -212,8 +213,8 @@ then nothing, forever, with no error anywhere.
 
 | Question | Why it matters | How to settle it |
 |---|---|---|
-| Vercel Hobby function ceiling `[?]` | Decides whether 30 seconds can be raised | Read the plan limits page, or test a long response |
-| Vercel Hobby cron frequency `[?]` | Decides whether ingest could ever be scheduled | Same |
+| ~~Vercel Hobby function ceiling~~ | Resolved 23 Sep 2026: with fluid compute the Hobby ceiling is 300 seconds, not 30. The routes still declare `maxDuration = 30` deliberately, because a question that needs longer has usually failed rather than slowed | |
+| ~~Vercel Hobby cron frequency~~ | Resolved 23 Sep 2026: once per day, fired within an hour of the stated time. Enough for the keep-alive ping, nowhere near enough to drive an ingest | |
 | Supabase free storage headroom `[?]` | Filing text plus chunks plus cache adds up | Check the project dashboard after the first ingest |
 | ~~Does `hnsw` build on this Postgres version~~ | Resolved 20 Sep: migration 0001 applied cleanly | |
 | ~~Indonesian question quality~~ | Resolved 20 Sep: two Indonesian questions are in the golden set and both route correctly, and answers come back in Indonesian with English citations | |
