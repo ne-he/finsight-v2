@@ -24,6 +24,7 @@ conversation history and vector search.
 | Retrieval | One vector search | Hybrid vector plus full-text, fused with RRF |
 | Targeting | One global search | Company and fiscal year filters applied inside the ranking |
 | Citations | None, or invented | Exact: `[NVDA FY2026 * Item 1A. Risk Factors]` plus source URL |
+| Comparisons | One search, one company wins | One search per company, interleaved |
 | Hallucination control | Hope | A confidence gate tuned from measured data |
 | When the model is down | An error, or silence | A degraded answer quoted from the retrieved passages |
 | Quality | "Looks fine" | An eval harness over a golden set |
@@ -32,27 +33,31 @@ conversation history and vector search.
 
 ## Measured results
 
-Corpus: NVDA FY2026 and AAPL FY2025, 582 chunks. Golden set of 18 questions,
-`gemini-embedding-001` at 768 dimensions, k = 6. Run with `npm run eval`, full
-report in [`evals/results/`](evals/results).
+Corpus: NVDA FY2026, AAPL FY2025 and MSFT FY2026, 936 chunks. Golden set of 22
+questions, `gemini-embedding-001` at 768 dimensions, k = 6. Run with
+`npm run eval`, full report in [`evals/results/`](evals/results).
 
 | Metric | Result | What it shows |
 |---|---|---|
-| Retrieval hit-rate@6 | **13/14** | The right company's filing reaches the top 6 |
+| Retrieval hit-rate@6 | **18/18** | The right company's filing reaches the top 6 |
 | Out-of-scope gate accuracy | **4/4** | Unanswerable questions are refused, not guessed |
 | False refusals | **0** | The gate never blocked a question the corpus could answer |
-| Mean top cosine | **0.765** | Healthy distance above the 0.68 gate |
-| Answerable cosine range | 0.722 to 0.808 | |
-| Out-of-scope cosine range | 0.472 to 0.612 | A clean gap of 0.110 |
+| Mean top cosine | **0.763** | Healthy distance above the 0.66 gate |
+| Answerable cosine range | 0.707 to 0.815 | |
+| Out-of-scope cosine range | 0.472 to 0.612 | A clean gap of 0.095 |
 
-The threshold is chosen from that gap rather than guessed, and this run
-confirms 0.68 still sits inside it on the new retriever.
+The threshold is chosen as the midpoint of that gap rather than guessed. v1
+used 0.68; on this corpus the lowest answerable question, a three-way
+comparison, scored 0.707, which left only 0.027 of margin, so the gate moved to
+0.66 where the margin is even on both sides.
 
-**The one miss is worth naming.** `Compare the revenue drivers of NVIDIA and
-Apple` retrieved only NVIDIA. Comparison questions have to win slots for two
-companies inside one top 6, and they are the first thing to break whenever
-retrieval is tuned. The same question class was what failed in v1 when chunk
-overlap was changed, so it stays in the golden set as an early warning.
+**Comparisons used to be the weak class, and were fixed rather than excused.**
+`Compare the revenue drivers of NVIDIA and Apple` came back with six NVIDIA
+chunks and nothing from Apple, because one ranked search over two filings is
+won by whichever filing phrases the topic closer to the question. Each company
+named in a question now gets its own search and the results are interleaved,
+which also carries a three-way comparison. Both comparison questions and the
+new three-way one retrieve every company they name.
 
 Cross-language retrieval is also measured, not asserted: two questions written
 in Indonesian both routed to the correct filing, and the answer comes back in
@@ -112,7 +117,31 @@ needs no cron frequency guarantee from the hosting plan, it gives the operator
 a live progress bar, and closing the tab pauses the job instead of losing it.
 
 Measured on real filings: NVIDIA FY2026 produced 362 chunks in 404 seconds,
-Apple FY2025 produced 220 chunks in 237 seconds.
+Apple FY2025 220 chunks in 237 seconds, and Microsoft FY2026 354 chunks in
+361 seconds.
+
+---
+
+## The interface
+
+The answer is only half of what this app is for. The other half is being able
+to check it, so the screen is split: the conversation on the left, the
+passages the answer was built from on the right.
+
+- Every citation tag in an answer is a numbered button. Clicking one opens the
+  passage it points at and highlights the sentence closest in wording to the
+  claim. The model does not report which sentence it used, so that highlight is
+  labelled as an estimate, and no highlight is shown when nothing overlaps,
+  which is what happens when the answer is in Indonesian.
+- Citations are numbered in the order the answer uses them, not in retrieval
+  order, so an answer never opens with [3].
+- A meter under the passages shows the best match against the 0.66 gate, so a
+  refusal is something a reader can see the reason for rather than a mood.
+- A citation tag that matches no retrieved passage is printed as it was
+  written, in the signal colour. A citation nobody can open is exactly the
+  thing a reader should be able to see.
+- On a phone the evidence panel becomes a sheet, opened by a citation or by
+  the Show evidence button.
 
 ---
 
@@ -170,6 +199,10 @@ src/
   proxy.ts               session refresh on every request
   lib/
     env.ts               validated server environment
+    answer-format.ts     parses a streamed answer into blocks and citations
+    highlight.ts         finds the sentence a claim most likely came from
+    company.ts           readable company names from EDGAR registrant names
+    corpus.ts            what is ingested, for the pages that show it
     gemini.ts            embeddings and streaming generation over REST
     sse.ts               incremental SSE decoder, and the encoder for our own stream
     auth.ts · guards.ts  who is calling, and whether they may
@@ -183,7 +216,8 @@ src/
       prompt.ts          system prompt, context wrapping, degraded answer
       retrieve.ts        hybrid search and the confidence gate
   app/                   pages, and api/ for chat, health, keep-alive, admin, feedback
-  components/            nav, auth form, chat view, ingest panel
+  components/            nav, auth form, ingest panel
+    chat/                answer body, evidence panel, match meter
 supabase/migrations/     schema, RLS policies, search function, rate limit, bootstrap
 scripts/                 verify, inspect, ingest, eval, promote
 evals/                   golden set and dated result reports
@@ -200,7 +234,6 @@ project is not is the easiest kind of documentation to get wrong.
 
 - **Not deployed.** No Vercel project is linked, so there is no public URL.
 - **Answer faithfulness is unmeasured.** Retrieval is; generation quality is not.
-- **One comparison question misses.** See [Measured results](#measured-results).
 - **No integration tests** against a live database. Unit tests cover the pure
   logic; the database path is covered by `npm run verify` and the eval harness,
   which are run deliberately rather than in CI.

@@ -119,14 +119,34 @@ and no v1 metric was allowed to stand for v2 until it had been re-measured.
 
 **Measured, 20 September 2026** (NVDA FY2026 and AAPL FY2025, 582 chunks, 18
 questions): hit-rate@6 13/14, gate accuracy 4/4, no false refusals, mean top
-cosine 0.765. Answerable questions scored 0.722 to 0.808 and out-of-scope ones
-0.472 to 0.612, a clean gap of 0.110, so 0.68 still sits inside the separation
-on the new retriever. The inherited number survived, but it is now a result
-rather than an assumption.
+cosine 0.765, a clean gap of 0.110. The single miss was a comparison question
+that retrieved only one of the two companies.
 
-The single miss is a comparison question that retrieved only one of the two
-companies. That class is the first to break when retrieval is tuned, which is
-why it stays in the golden set.
+**Re-measured, 21 September 2026** (MSFT FY2026 added, 936 chunks, 22
+questions, comparison retrieval fixed below): hit-rate@6 18/18, gate accuracy
+4/4, no false refusals, mean top cosine 0.763. Answerable questions scored
+0.707 to 0.815 and out-of-scope ones 0.472 to 0.612, a gap of 0.095. The
+lowest answerable score is a three-way comparison, only 0.027 above 0.68, so
+the gate moved to the midpoint of the measured gap, 0.66. The threshold is now
+a result of the measurement rather than a number carried over from v1.
+
+### 5a. A search per company in a comparison
+
+**Problem:** one ranked search over two filings returns whichever filing
+phrases the topic closer to the question. "Compare the revenue drivers of
+NVIDIA and Apple" returned six NVIDIA chunks and no Apple, so the answer could
+only ever describe one side.
+
+**Decided:** when query understanding detects more than one company, run one
+search per company with the same embedding and interleave the results by rank,
+never fewer than one passage per company.
+
+**Cost:** n round trips to Postgres instead of one, on comparison questions
+only. No extra embedding call, because the vector is computed once.
+
+**Alternative rejected:** raising `final_k` for comparisons. That makes the
+dominant filing take more of the context as well, so it does not guarantee the
+other company appears at all.
 
 ---
 
@@ -198,6 +218,27 @@ then nothing, forever, with no error anywhere.
 | ~~Does `hnsw` build on this Postgres version~~ | Resolved 20 Sep: migration 0001 applied cleanly | |
 | ~~Indonesian question quality~~ | Resolved 20 Sep: two Indonesian questions are in the golden set and both route correctly, and answers come back in Indonesian with English citations | |
 | Answer faithfulness | Retrieval is measured, generation is not | Needs an LLM judge and more generation quota than one day allows |
+
+---
+
+## 9a. The evidence panel is part of the argument
+
+**Decided:** ship the retrieved passages to the browser with the answer, and
+show them beside it.
+
+Citations that only name a section still ask the reader to open a 300 page
+filing and search it. The panel closes that gap: a numbered citation opens the
+passage it points at, with the sentence closest in wording to the claim
+highlighted.
+
+**The honest limit:** the model does not report which sentence it used. The
+highlight is a word-overlap estimate, labelled as one, and suppressed entirely
+when the overlap is thin, which is what happens when an Indonesian answer
+cites an English filing. A confident highlight on the wrong sentence would be
+worse than no highlight.
+
+**Cost:** roughly 8 KB of passage text per answer, stored on the message row
+so a saved conversation can still be checked later.
 
 ---
 
