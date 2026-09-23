@@ -21,32 +21,49 @@ export default async function HistoryPage() {
   const rows = conversations ?? [];
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-10">
-      <h1 className="text-lg font-semibold tracking-tight">History</h1>
+    <div className="mx-auto w-full max-w-[880px] px-4 py-12 sm:px-8">
+      <p className="label">History</p>
+      <h1 className="mt-3 font-serif text-[40px] leading-none">Your questions</h1>
 
       {rows.length === 0 ? (
-        <p className="mt-3 text-sm text-muted">
-          Nothing here yet. Conversations appear once you ask something.
-        </p>
+        <div className="mt-8 border border-rule-soft bg-surface-raised p-6">
+          <p className="text-sm leading-relaxed text-muted">
+            Nothing here yet. Conversations are listed once you ask something.
+          </p>
+          <Link
+            href="/chat"
+            className="mt-4 inline-flex h-10 items-center bg-accent px-5 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-85"
+          >
+            Ask a question
+          </Link>
+        </div>
       ) : (
-        <ul className="mt-6 divide-y divide-border border-y border-border">
+        <ul className="mt-8 border-t border-border">
           {rows.map((row) => (
-            <li key={row.id}>
+            <li key={row.id} className="border-b border-rule-soft">
               <Link
                 href={`/chat/${row.id}`}
-                className="flex items-baseline justify-between gap-4 py-3 transition-colors hover:text-accent"
+                className="group flex items-baseline gap-4 py-4 transition-colors hover:bg-surface-raised"
               >
-                <span className="truncate text-sm">{row.title}</span>
                 <time
                   dateTime={row.updated_at as string}
-                  className="shrink-0 text-xs text-muted"
+                  className="w-24 shrink-0 font-mono text-[11px] text-muted"
                 >
-                  {new Date(row.updated_at as string).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
+                  {new Date(row.updated_at as string)
+                    .toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
+                    .toUpperCase()}
                 </time>
+                <span className="min-w-0 flex-1 truncate text-[15px]">{row.title}</span>
+                <span
+                  aria-hidden
+                  className="shrink-0 font-mono text-xs text-muted transition-transform group-hover:translate-x-1"
+                >
+                  &#8594;
+                </span>
               </Link>
             </li>
           ))}

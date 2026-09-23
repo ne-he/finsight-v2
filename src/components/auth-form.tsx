@@ -7,6 +7,9 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
 
+const FIELD =
+  "h-11 w-full border border-border bg-background px-3 text-sm outline-none transition-shadow focus:shadow-[inset_0_-2px_0_0_var(--foreground)]";
+
 export function AuthForm() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("signin");
@@ -53,9 +56,9 @@ export function AuthForm() {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
-      <div className="space-y-1.5">
-        <label htmlFor="email" className="block text-sm font-medium">
+    <form onSubmit={submit} className="space-y-5">
+      <div className="space-y-2">
+        <label htmlFor="email" className="label block">
           Email
         </label>
         <input
@@ -65,12 +68,12 @@ export function AuthForm() {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="h-10 w-full rounded-md border border-border bg-surface-raised px-3 text-sm outline-none focus:border-accent"
+          className={FIELD}
         />
       </div>
 
-      <div className="space-y-1.5">
-        <label htmlFor="password" className="block text-sm font-medium">
+      <div className="space-y-2">
+        <label htmlFor="password" className="label block">
           Password
         </label>
         <input
@@ -81,7 +84,7 @@ export function AuthForm() {
           autoComplete={mode === "signin" ? "current-password" : "new-password"}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="h-10 w-full rounded-md border border-border bg-surface-raised px-3 text-sm outline-none focus:border-accent"
+          className={FIELD}
         />
         {mode === "signup" ? (
           <p className="text-xs text-muted">At least 8 characters.</p>
@@ -91,7 +94,11 @@ export function AuthForm() {
       {notice ? (
         <p
           role="alert"
-          className={`text-sm ${notice.kind === "error" ? "text-danger" : "text-muted"}`}
+          className={`border-l-2 pl-3 text-sm ${
+            notice.kind === "error"
+              ? "border-danger text-danger"
+              : "border-signal text-muted"
+          }`}
         >
           {notice.text}
         </p>
@@ -100,7 +107,7 @@ export function AuthForm() {
       <button
         type="submit"
         disabled={busy}
-        className="h-10 w-full rounded-md bg-accent text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+        className="h-11 w-full bg-accent text-sm font-medium text-accent-foreground transition-opacity hover:opacity-85 disabled:opacity-50"
       >
         {busy ? "Working..." : mode === "signin" ? "Sign in" : "Create account"}
       </button>
@@ -111,7 +118,7 @@ export function AuthForm() {
           setMode(mode === "signin" ? "signup" : "signin");
           setNotice(null);
         }}
-        className="w-full text-sm text-muted hover:text-foreground transition-colors"
+        className="w-full text-sm text-muted underline-offset-4 transition-colors hover:text-foreground hover:underline"
       >
         {mode === "signin"
           ? "No account yet? Create one"

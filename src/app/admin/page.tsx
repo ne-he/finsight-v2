@@ -1,4 +1,5 @@
 import { IngestPanel } from "@/components/ingest-panel";
+import { displayName } from "@/lib/company";
 import { requireAdminOrRedirect } from "@/lib/guards";
 import { supabaseAdmin } from "@/lib/supabase/server";
 
@@ -22,58 +23,72 @@ export default async function AdminPage() {
     admin.from("fs_feedback").select("rating"),
   ]);
 
+  const rows = filings ?? [];
   const ratings = feedback ?? [];
   const helpful = ratings.filter((r) => r.rating === 1).length;
+  const passages = rows.reduce((sum, f) => sum + Number(f.chunk_count ?? 0), 0);
+
+  const stats = [
+    { label: "Filings", value: String(rows.length) },
+    { label: "Passages", value: passages.toLocaleString("en-US") },
+    {
+      label: "Rated helpful",
+      value: ratings.length > 0 ? `${helpful}/${ratings.length}` : "none yet",
+    },
+  ];
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-10">
+    <div className="mx-auto w-full max-w-[980px] space-y-10 px-4 py-12 sm:px-8">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">Admin</h1>
-        <p className="mt-1 text-sm text-muted">
-          {ratings.length > 0
-            ? `${helpful} of ${ratings.length} rated answers marked helpful.`
-            : "No answer feedback yet."}
-        </p>
+        <p className="label">Admin</p>
+        <h1 className="mt-3 font-serif text-[40px] leading-none">Corpus and ingestion</h1>
       </div>
+
+      <dl className="grid grid-cols-3 border-y border-border">
+        {stats.map((stat, i) => (
+          <div key={stat.label} className={`py-4 ${i > 0 ? "border-l border-rule-soft pl-4" : ""}`}>
+            <dt className="label">{stat.label}</dt>
+            <dd className="mt-1 font-mono text-2xl">{stat.value}</dd>
+          </div>
+        ))}
+      </dl>
 
       <IngestPanel />
 
       <section>
-        <h2 className="text-sm font-medium">Corpus</h2>
-        {filings && filings.length > 0 ? (
+        <p className="label">Corpus</p>
+        {rows.length > 0 ? (
           <table className="mt-3 w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs text-muted">
-                <th className="py-2 font-medium">Ticker</th>
-                <th className="py-2 font-medium">Company</th>
-                <th className="py-2 font-medium">FY</th>
-                <th className="py-2 text-right font-medium">Chunks</th>
-                <th className="py-2 text-right font-medium">Status</th>
+              <tr className="border-b border-border text-left">
+                <th className="label py-2 font-medium">Ticker</th>
+                <th className="label py-2 font-medium">Company</th>
+                <th className="label py-2 font-medium">Fiscal year</th>
+                <th className="label py-2 text-right font-medium">Passages</th>
+                <th className="label py-2 text-right font-medium">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {filings.map((filing) => (
-                <tr key={filing.id}>
-                  <td className="py-2 font-mono text-xs">{filing.ticker}</td>
-                  <td className="py-2">
+            <tbody>
+              {rows.map((filing) => (
+                <tr key={filing.id} className="border-b border-rule-soft">
+                  <td className="py-2.5 font-mono text-xs">{filing.ticker}</td>
+                  <td className="py-2.5">
                     <a
                       href={filing.source_url as string}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="hover:text-accent"
+                      className="underline-offset-4 hover:underline"
                     >
-                      {filing.company}
+                      {displayName(filing.company as string)}
                     </a>
                   </td>
-                  <td className="py-2 text-muted">{filing.fiscal_year}</td>
-                  <td className="py-2 text-right font-mono text-xs">
-                    {filing.chunk_count}
-                  </td>
-                  <td className="py-2 text-right text-xs">
+                  <td className="py-2.5 font-mono text-xs text-muted">FY{filing.fiscal_year}</td>
+                  <td className="py-2.5 text-right font-mono text-xs">{filing.chunk_count}</td>
+                  <td className="py-2.5 text-right font-mono text-xs">
                     {filing.is_ready ? (
                       <span className="text-muted">ready</span>
                     ) : (
-                      <span className="text-danger">incomplete</span>
+                      <span className="text-signal">incomplete</span>
                     )}
                   </td>
                 </tr>
@@ -86,20 +101,31 @@ export default async function AdminPage() {
       </section>
 
       <section>
-        <h2 className="text-sm font-medium">Recent jobs</h2>
+        <p className="label">Recent jobs</p>
         {jobs && jobs.length > 0 ? (
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-3 border-t border-rule-soft">
             {jobs.map((job) => (
-              <li key={job.id} className="flex items-baseline gap-3 text-xs">
-                <span className="font-mono">{job.ticker}</span>
+              <li
+                key={job.id}
+                className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-rule-soft py-2.5 font-mono text-[11px]"
+              >
+                <span className="w-14">{job.ticker}</span>
                 <span className={job.status === "failed" ? "text-danger" : "text-muted"}>
                   {job.status}
                 </span>
                 <span className="text-muted">
-                  {job.embedded_chunks}/{job.total_chunks}
+                  {job.embedded_chunks}/{job.total_chunks} embedded
+                </span>
+                <span className="ml-auto text-muted">
+                  {new Date(job.created_at as string).toLocaleString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
                 </span>
                 {job.error ? (
-                  <span className="truncate text-danger">{job.error}</span>
+                  <span className="w-full truncate text-danger">{job.error}</span>
                 ) : null}
               </li>
             ))}

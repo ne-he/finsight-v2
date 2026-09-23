@@ -13,12 +13,19 @@ interface Progress {
   error?: string;
 }
 
-const STAGE_LABEL: Record<Progress["status"], string> = {
+const STAGES = [
+  { key: "fetching", label: "Download" },
+  { key: "chunking", label: "Split" },
+  { key: "embedding", label: "Embed" },
+  { key: "ready", label: "Ready" },
+] as const;
+
+const STAGE_DETAIL: Record<Progress["status"], string> = {
   queued: "Queued",
-  fetching: "Downloading the filing from SEC",
-  chunking: "Splitting it into sections and chunks",
-  embedding: "Embedding chunks",
-  ready: "Ready",
+  fetching: "Downloading the filing from SEC EDGAR",
+  chunking: "Splitting it into sections and passages",
+  embedding: "Embedding passages",
+  ready: "Ready to answer from",
   failed: "Failed",
 };
 
@@ -90,38 +97,73 @@ export function IngestPanel() {
     progress && progress.totalChunks > 0
       ? Math.round((progress.embeddedChunks / progress.totalChunks) * 100)
       : 0;
+  const stageIndex = progress
+    ? STAGES.findIndex((stage) => stage.key === progress.status)
+    : -1;
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-4">
-      <h2 className="text-sm font-medium">Add a company</h2>
-      <p className="mt-1 text-xs text-muted">
-        Downloads the most recent 10-K from SEC EDGAR, then chunks and embeds
-        it. Keep this tab open until it finishes.
+    <section className="border border-border bg-surface-raised p-6">
+      <p className="label">Add a company</p>
+      <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
+        Downloads the most recent 10-K from SEC EDGAR, splits it by Item, and
+        embeds every passage. A large filing takes several minutes and roughly
+        one embedding request per passage, so keep this tab open until it
+        finishes. Closing it pauses the job rather than losing it.
       </p>
 
-      <form onSubmit={run} className="mt-4 flex gap-2">
+      <form onSubmit={run} className="mt-5 flex gap-2">
         <input
           value={ticker}
           onChange={(e) => setTicker(e.target.value.toUpperCase())}
-          placeholder="NVDA"
+          placeholder="MSFT"
+          aria-label="Ticker"
           maxLength={10}
           disabled={running}
-          className="h-10 w-32 rounded-md border border-border bg-surface-raised px-3 font-mono text-sm uppercase outline-none focus:border-accent disabled:opacity-60"
+          className="h-11 w-36 border border-border bg-background px-3 font-mono text-sm uppercase outline-none focus:shadow-[inset_0_-2px_0_0_var(--foreground)] disabled:opacity-60"
         />
         <button
           type="submit"
           disabled={running || ticker.trim().length === 0}
-          className="h-10 rounded-md bg-accent px-4 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
+          className="h-11 bg-accent px-6 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-85 disabled:opacity-40"
         >
           {running ? "Ingesting..." : "Ingest"}
         </button>
       </form>
 
       {progress ? (
-        <div className="mt-4 space-y-2">
-          <div className="flex justify-between text-xs">
+        <div className="mt-6">
+          <ol className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-[11px]">
+            {STAGES.map((stage, i) => {
+              const state =
+                progress.status === "failed" && i === stageIndex
+                  ? "failed"
+                  : i < stageIndex || progress.status === "ready"
+                    ? "done"
+                    : i === stageIndex
+                      ? "active"
+                      : "todo";
+              return (
+                <li
+                  key={stage.key}
+                  className={
+                    state === "failed"
+                      ? "text-danger"
+                      : state === "active"
+                        ? "text-foreground"
+                        : state === "done"
+                          ? "text-muted line-through"
+                          : "text-muted opacity-60"
+                  }
+                >
+                  {i + 1}. {stage.label}
+                </li>
+              );
+            })}
+          </ol>
+
+          <div className="mt-3 flex items-baseline justify-between text-xs">
             <span>
-              {progress.ticker}: {STAGE_LABEL[progress.status]}
+              {progress.ticker}: {STAGE_DETAIL[progress.status]}
             </span>
             {progress.totalChunks > 0 ? (
               <span className="font-mono text-muted">
@@ -129,15 +171,16 @@ export function IngestPanel() {
               </span>
             ) : null}
           </div>
+
           <div
             role="progressbar"
             aria-valuenow={percent}
             aria-valuemin={0}
             aria-valuemax={100}
-            className="h-1.5 w-full overflow-hidden rounded-full bg-border"
+            className="mt-2 h-1.5 w-full overflow-hidden bg-rule-soft"
           >
             <div
-              className="h-full bg-accent transition-all duration-300"
+              className="h-full bg-foreground transition-all duration-300"
               style={{ width: `${progress.status === "ready" ? 100 : percent}%` }}
             />
           </div>
@@ -145,7 +188,7 @@ export function IngestPanel() {
       ) : null}
 
       {error ? (
-        <p role="alert" className="mt-3 text-xs text-danger">
+        <p role="alert" className="mt-4 border-l-2 border-danger pl-3 text-sm text-danger">
           {error}
         </p>
       ) : null}
