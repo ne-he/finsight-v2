@@ -9,8 +9,10 @@ v2 is a rewrite of [the original Python system](https://github.com/ne-he/RAG_bus
 as a single Next.js application on Vercel, with Supabase for authentication,
 conversation history and vector search.
 
-> **Status: working locally, not deployed.** Sign in, ask, history and admin
-> ingest all run against a live database. Retrieval quality is measured on this
+**Live: <https://finsight-v2-nine.vercel.app>**
+
+> **Status: deployed and answering.** Sign in, ask, history and admin ingest all
+> run against a live database. Retrieval quality is measured on this
 > implementation, not inherited. See [What is not done yet](#what-is-not-done-yet).
 
 ---
@@ -232,7 +234,6 @@ docs/ARCHITECTURE.md     decisions and trade-offs
 Listed rather than implied, because a README that reads as finished when the
 project is not is the easiest kind of documentation to get wrong.
 
-- **Not deployed.** No Vercel project is linked, so there is no public URL.
 - **Answer faithfulness is unmeasured.** Retrieval is; generation quality is not.
 - **No integration tests** against a live database. Unit tests cover the pure
   logic; the database path is covered by `npm run verify` and the eval harness,
