@@ -121,6 +121,35 @@ export function parseAnswer(text: string): Block[] {
   return blocks;
 }
 
+/** Every citation tag in the order it appears. */
+export function citationsIn(text: string): { ticker: string; fiscalYear: string; section: string }[] {
+  return [...text.matchAll(CITE_RE)].map((match) => ({
+    ticker: match[1],
+    fiscalYear: match[2],
+    section: match[3].trim(),
+  }));
+}
+
+/**
+ * Sources in the order the answer cites them, uncited ones last.
+ *
+ * Retrieval order is a ranking, not a reading order, so without this an answer
+ * can open with citation [3] and never mention [1] at all. Appending text
+ * cannot reorder what came before, so the numbering stays stable while the
+ * answer streams.
+ */
+export function orderByCitation<T extends CitableSource>(text: string, sources: T[]): T[] {
+  const order: number[] = [];
+  for (const cite of citationsIn(text)) {
+    const index = matchSource(cite, sources);
+    if (index >= 0 && !order.includes(index)) order.push(index);
+  }
+  sources.forEach((_, index) => {
+    if (!order.includes(index)) order.push(index);
+  });
+  return order.map((index) => sources[index]);
+}
+
 /**
  * Which listed source does a citation tag point at, or -1 for none.
  *

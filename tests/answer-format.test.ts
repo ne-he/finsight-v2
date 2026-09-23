@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { matchSource, parseAnswer, parseInline } from "@/lib/answer-format";
+import { matchSource, orderByCitation, parseAnswer, parseInline } from "@/lib/answer-format";
 
 describe("parseInline", () => {
   it("extracts a citation tag", () => {
@@ -87,5 +87,33 @@ describe("matchSource", () => {
       matchSource({ ticker: "AAPL", fiscalYear: "2026", section: "Item 1A. Risk Factors" }, sources),
     ).toBe(-1);
     expect(matchSource({ ticker: "NVDA", fiscalYear: "2026", section: "Appendix" }, sources)).toBe(-1);
+  });
+});
+
+describe("orderByCitation", () => {
+  const sources = [
+    { ticker: "AAPL", fiscalYear: "2025", section: "Item 8. Financial Statements" },
+    { ticker: "NVDA", fiscalYear: "2026", section: "Item 15. Exhibits" },
+    { ticker: "NVDA", fiscalYear: "2026", section: "Item 7. MD&A" },
+  ];
+
+  it("puts the first cited source first and keeps uncited ones at the end", () => {
+    const answer =
+      "Revenue grew [NVDA FY2026 * Item 7. MD&A]. Apple reports segments [AAPL FY2025 * Item 8. Financial Statements].";
+    expect(orderByCitation(answer, sources).map((s) => s.section)).toEqual([
+      "Item 7. MD&A",
+      "Item 8. Financial Statements",
+      "Item 15. Exhibits",
+    ]);
+  });
+
+  it("is stable as the answer streams in", () => {
+    const partial = "Revenue grew [NVDA FY2026 * Item 7. MD&A]. Apple";
+    const full = `${partial} reports segments [AAPL FY2025 * Item 8. Financial Statements].`;
+    expect(orderByCitation(partial, sources)[0]).toEqual(orderByCitation(full, sources)[0]);
+  });
+
+  it("returns the same list when nothing is cited", () => {
+    expect(orderByCitation("No citations here.", sources)).toEqual(sources);
   });
 });
