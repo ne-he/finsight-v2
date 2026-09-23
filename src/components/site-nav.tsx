@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { NavLinks } from "@/components/nav-links";
 import { currentViewer } from "@/lib/auth";
 
 /**
@@ -12,33 +13,30 @@ import { currentViewer } from "@/lib/auth";
 export async function SiteNav() {
   const viewer = await currentViewer();
 
+  const links = viewer
+    ? [
+        { href: "/chat", label: "Ask" },
+        { href: "/history", label: "History" },
+        ...(viewer.role === "admin" ? [{ href: "/admin", label: "Admin" }] : []),
+      ]
+    : [];
+
   return (
-    <header className="border-b border-border bg-surface">
-      <nav className="mx-auto flex h-14 w-full max-w-4xl items-center gap-6 px-4">
-        <Link href="/" className="font-semibold tracking-tight">
-          FinSight
+    <header className="relative z-30 h-[var(--nav-h)] shrink-0 border-b border-border bg-background">
+      <nav className="mx-auto flex h-full w-full max-w-[1440px] items-center gap-6 px-4 sm:gap-10 sm:px-6">
+        <Link href="/" className="flex items-baseline gap-3">
+          <span className="font-serif text-[26px] leading-none">FinSight</span>
+          <span className="label hidden md:inline">10-K evidence desk</span>
         </Link>
 
         {viewer ? (
           <>
-            <div className="flex items-center gap-4 text-sm text-muted">
-              <Link href="/chat" className="hover:text-foreground transition-colors">
-                Ask
-              </Link>
-              <Link href="/history" className="hover:text-foreground transition-colors">
-                History
-              </Link>
-              {viewer.role === "admin" ? (
-                <Link href="/admin" className="hover:text-foreground transition-colors">
-                  Admin
-                </Link>
-              ) : null}
-            </div>
-
-            <form action="/auth/signout" method="post" className="ml-auto">
+            <NavLinks links={links} />
+            <form action="/auth/signout" method="post" className="ml-auto flex items-center gap-4">
+              <span className="hidden font-mono text-xs text-muted lg:inline">{viewer.email}</span>
               <button
                 type="submit"
-                className="text-sm text-muted hover:text-foreground transition-colors"
+                className="text-sm text-muted underline-offset-4 transition-colors hover:text-foreground hover:underline"
               >
                 Sign out
               </button>
@@ -47,7 +45,7 @@ export async function SiteNav() {
         ) : (
           <Link
             href="/login"
-            className="ml-auto text-sm text-muted hover:text-foreground transition-colors"
+            className="ml-auto border border-border px-3.5 py-1.5 text-sm transition-colors hover:bg-foreground hover:text-background"
           >
             Sign in
           </Link>

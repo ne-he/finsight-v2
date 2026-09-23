@@ -1,39 +1,60 @@
 @import "tailwindcss";
 
 /*
- * A small, deliberately boring token set. Every surface, border and muted text
- * in the app refers to these, so light and dark mode stay consistent without
- * any component knowing which one is active.
+ * FinSight's visual language: an annotated annual report.
+ *
+ * Paper and ink, hard 1px rules instead of shadows, a serif for questions and
+ * titles, a monospace for anything that is data (tickers, fiscal years,
+ * scores). There is exactly one highlighter colour and it is used only for
+ * evidence, so yellow on this site always means "this is the sentence the
+ * answer came from". The orange signal colour means the confidence threshold,
+ * or something that fell below it.
+ *
+ * Every component reads these tokens, so a re-theme is an edit to this block.
  */
 :root {
-  --background: #ffffff;
-  --surface: #fafafa;
-  --surface-raised: #ffffff;
-  --foreground: #18181b;
-  --muted: #71717a;
-  --border: #e4e4e7;
-  --accent: #1d4ed8;
-  --accent-foreground: #ffffff;
-  --danger: #b91c1c;
-  --warning-surface: #fef9c3;
-  --warning-border: #fde047;
-  --warning-foreground: #713f12;
+  --nav-h: 57px;
+
+  --background: #f3efe6;
+  --surface: #ebe6da;
+  --surface-raised: #fbf9f4;
+  --foreground: #1b1a17;
+  --muted: #6b6558;
+  --border: #1b1a17;
+  --rule-soft: #d8d1c1;
+  --accent: #1b1a17;
+  --accent-foreground: #f3efe6;
+  --marker: #e4f24a;
+  --marker-ink: #1b1a17;
+  --signal: #c2410c;
+  --danger: #b42318;
+  --warning-surface: #fcebd7;
+  --warning-border: #c2410c;
+  --warning-foreground: #7c2d12;
+
+  /* Paper grain. A static SVG noise tile, so it costs nothing at runtime. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .1 0 0 0 0 .09 0 0 0 0 .07 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #09090b;
-    --surface: #111113;
-    --surface-raised: #18181b;
-    --foreground: #f4f4f5;
-    --muted: #a1a1aa;
-    --border: #27272a;
-    --accent: #60a5fa;
-    --accent-foreground: #09090b;
+    --background: #11100e;
+    --surface: #171613;
+    --surface-raised: #1c1b17;
+    --foreground: #ece7db;
+    --muted: #9a9384;
+    --border: #4a4740;
+    --rule-soft: #2c2a26;
+    --accent: #ece7db;
+    --accent-foreground: #11100e;
+    --marker: #d9e83a;
+    --marker-ink: #11100e;
+    --signal: #fb923c;
     --danger: #f87171;
-    --warning-surface: #27240f;
-    --warning-border: #57450f;
-    --warning-foreground: #fde68a;
+    --warning-surface: #24170c;
+    --warning-border: #9a3412;
+    --warning-foreground: #fdba74;
+    --grain: none;
   }
 }
 
@@ -44,32 +65,145 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
+  --color-rule-soft: var(--rule-soft);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-marker: var(--marker);
+  --color-marker-ink: var(--marker-ink);
+  --color-signal: var(--signal);
   --color-danger: var(--danger);
   --color-warning-surface: var(--warning-surface);
   --color-warning-border: var(--warning-border);
   --color-warning-foreground: var(--warning-foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-instrument-sans);
+  --font-serif: var(--font-instrument-serif);
+  --font-mono: var(--font-plex-mono);
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
+  background-image: var(--grain);
   color: var(--foreground);
 }
 
-/* Answers arrive as plain text with line breaks, so honour them. */
-.answer-text {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+::selection {
+  background: var(--marker);
+  color: var(--marker-ink);
 }
 
-@keyframes pulse-dot {
-  0%, 80%, 100% { opacity: 0.25; }
-  40% { opacity: 1; }
+:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
 }
 
-.typing-dot {
-  animation: pulse-dot 1.2s infinite ease-in-out;
+/* Small upper-case mono labels: "YOU ASKED", "EVIDENCE". Literal, never clever. */
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The highlighter. Drawn across the sentence rather than switched on. */
+.marker {
+  background-image: linear-gradient(var(--marker), var(--marker));
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  color: var(--marker-ink);
+  padding: 0.05em 0.1em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  animation: marker-sweep 650ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes marker-sweep {
+  from {
+    background-size: 0% 100%;
+  }
+  to {
+    background-size: 100% 100%;
+  }
+}
+
+/* A block cursor at the end of an answer that is still being written. */
+.caret::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 1.05em;
+  margin-left: 3px;
+  vertical-align: -0.18em;
+  background: currentColor;
+  animation: caret-blink 1s steps(2, start) infinite;
+}
+
+@keyframes caret-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* Staggered entrance. Set --i on each element to order them. */
+.reveal {
+  animation: rise 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fade-in {
+  animation: fade 240ms ease-out both;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.sheet-up {
+  animation: sheet 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes sheet {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Quiet scrollbars for the independently scrolling panes. */
+.pane {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-soft) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
