@@ -5,6 +5,7 @@ import { CONFIDENCE_THRESHOLD } from "@/config";
 import { currentViewer } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { loadCorpus, loadSpecimen } from "@/lib/corpus";
+import { guestModeAvailable } from "@/lib/guest";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +17,7 @@ export const dynamic = "force-dynamic";
 export default async function Home() {
   if (await currentViewer()) redirect("/chat");
 
-  const corpus = await loadCorpus();
+  const [corpus, guestOpen] = await Promise.all([loadCorpus(), guestModeAvailable()]);
   const specimen = await loadSpecimen(corpus).catch(() => null);
   const passages = corpus.reduce((sum, c) => sum + c.chunkCount, 0);
 
@@ -45,15 +46,38 @@ export default async function Home() {
         </p>
 
         <div className="reveal mt-9 flex flex-wrap items-center gap-4" style={{ "--i": 3 } as React.CSSProperties}>
-          <Link
-            href="/login"
-            className="inline-flex h-12 items-center bg-accent px-7 text-[15px] font-medium text-accent-foreground transition-opacity hover:opacity-85"
-          >
-            Sign in to start
-          </Link>
-          <span className="text-sm text-muted">
-            Free account, {env().DAILY_LIMIT_PER_USER} questions a day.
-          </span>
+          {guestOpen ? (
+            <>
+              <Link
+                href="/try"
+                className="inline-flex h-12 items-center bg-accent px-7 text-[15px] font-medium text-accent-foreground transition-opacity hover:opacity-85"
+              >
+                Try it without an account
+              </Link>
+              <Link
+                href="/login"
+                className="inline-flex h-12 items-center border border-border px-6 text-[15px] transition-colors hover:bg-foreground hover:text-background"
+              >
+                Sign in
+              </Link>
+              <span className="w-full text-sm text-muted">
+                {env().GUEST_LIMIT_PER_VISITOR} questions a day as a guest, or a free
+                account for {env().DAILY_LIMIT_PER_USER} a day with saved history.
+              </span>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="inline-flex h-12 items-center bg-accent px-7 text-[15px] font-medium text-accent-foreground transition-opacity hover:opacity-85"
+              >
+                Sign in to start
+              </Link>
+              <span className="text-sm text-muted">
+                Free account, {env().DAILY_LIMIT_PER_USER} questions a day.
+              </span>
+            </>
+          )}
         </div>
 
         <dl

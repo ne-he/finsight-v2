@@ -143,6 +143,28 @@ async function main() {
     }
   }
 
+  section("Guest mode (migration 0006, optional)");
+  {
+    // '*' is the reserved totals row, so the function must refuse it before it
+    // counts anything. That refusal proves the function exists without using
+    // up any quota.
+    const { error } = await admin.rpc("fs_bump_guest_usage", {
+      p_visitor: "*",
+      p_visitor_limit: 1,
+      p_guest_limit: 1,
+      p_global_limit: 1,
+    });
+    if (error && /invalid visitor id/i.test(error.message)) {
+      pass("fs_bump_guest_usage()", "exists and rejects the reserved id");
+    } else if (error && /does not exist|could not find/i.test(error.message)) {
+      warn("fs_bump_guest_usage()", "not applied, so guest mode stays hidden");
+    } else if (!error) {
+      warn("fs_bump_guest_usage()", "accepted the reserved id");
+    } else {
+      warn("fs_bump_guest_usage()", error.message);
+    }
+  }
+
   section("Profile bootstrap (migration 0005)");
   {
     // Called with a uuid that owns no auth.users row, so a foreign key error

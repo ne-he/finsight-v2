@@ -17,6 +17,11 @@ interface Props {
   initialMessages?: ChatMessage[];
   corpus: CorpusItem[];
   suggestions?: string[];
+  /**
+   * Guest mode: questions go to `/api/guest/chat`, nothing is saved, and the
+   * URL never changes to a conversation that would not exist.
+   */
+  guest?: { perVisitor: number };
 }
 
 /**
@@ -31,7 +36,10 @@ export function ChatView({
   initialMessages = [],
   corpus,
   suggestions = [],
+  guest,
 }: Props) {
+  const endpoint = guest ? "/api/guest/chat" : "/api/chat";
+  const homePath = guest ? "/try" : "/chat";
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -105,7 +113,7 @@ export function ChatView({
       });
 
     try {
-      const response = await fetch("/api/chat", {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: trimmed, history, conversationId: threadId }),
@@ -156,7 +164,7 @@ export function ChatView({
               latencyMs: event.latencyMs as number,
             });
             // Make the conversation linkable without a navigation.
-            if (id && window.location.pathname === "/chat") {
+            if (!guest && id && window.location.pathname === "/chat") {
               window.history.replaceState(null, "", `/chat/${id}`);
             }
           }
@@ -182,7 +190,7 @@ export function ChatView({
     setThreadId(undefined);
     setFocus(null);
     setError(null);
-    window.history.replaceState(null, "", "/chat");
+    window.history.replaceState(null, "", homePath);
     composerRef.current?.focus();
   }
 
@@ -262,6 +270,15 @@ export function ChatView({
 
         <div className="shrink-0 border-t border-border bg-background px-4 py-4 sm:px-8">
           <div className="mx-auto w-full max-w-[760px]">
+            {guest ? (
+              <p className="mb-3 text-xs text-muted">
+                Guest mode: {guest.perVisitor} questions a day, nothing is saved.{" "}
+                <a href="/login" className="underline underline-offset-4 hover:text-foreground">
+                  Sign in
+                </a>{" "}
+                for more and for history.
+              </p>
+            ) : null}
             {error ? (
               <p role="alert" className="mb-3 border-l-2 border-danger pl-3 text-sm text-danger">
                 {error}

@@ -11,8 +11,9 @@ conversation history and vector search.
 
 **Live: <https://finsight-v2-nine.vercel.app>**
 
-> **Status: deployed and answering.** Sign in, ask, history and admin ingest all
-> run against a live database. Retrieval quality is measured on this
+> **Status: deployed and answering.** Try it without an account (a few
+> questions a day, nothing saved), or sign in for history. Ask, history and
+> admin ingest all run against a live database. Retrieval quality is measured on this
 > implementation, not inherited. See [What is not done yet](#what-is-not-done-yet).
 
 ---
@@ -144,6 +145,11 @@ passages the answer was built from on the right.
   thing a reader should be able to see.
 - On a phone the evidence panel becomes a sheet, opened by a citation or by
   the Show evidence button.
+- `/try` is the same desk without an account. Guests get a small daily quota,
+  counted in the database against a daily HMAC of their IP (the address itself
+  is never stored), and nothing they ask is saved. Their questions also count
+  toward the global cap, so guests cannot use up quota meant for signed-in
+  users. The entry point only appears once migration 0006 is applied.
 
 ---
 
@@ -220,7 +226,7 @@ src/
   app/                   pages, and api/ for chat, health, keep-alive, admin, feedback
   components/            nav, auth form, ingest panel
     chat/                answer body, evidence panel, match meter
-supabase/migrations/     schema, RLS policies, search function, rate limit, bootstrap
+supabase/migrations/     schema, RLS policies, search function, rate limit, bootstrap, guest quota
 scripts/                 verify, inspect, ingest, eval, promote
 evals/                   golden set and dated result reports
 tests/                   Vitest, offline

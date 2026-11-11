@@ -33,6 +33,10 @@ const schema = z.object({
   DAILY_LIMIT_PER_USER: z.coerce.number().int().positive().default(40),
   DAILY_LIMIT_GLOBAL: z.coerce.number().int().positive().default(400),
 
+  /** Guest mode: questions per visitor per day, and across all guests per day. */
+  GUEST_LIMIT_PER_VISITOR: z.coerce.number().int().positive().default(5),
+  GUEST_LIMIT_DAILY: z.coerce.number().int().positive().default(80),
+
   /** Shared secret for the scheduled keep-alive call. */
   CRON_SECRET: z.string().trim().min(8).optional(),
 });
