@@ -165,8 +165,12 @@ and the tests cover the case that actually breaks naive parsers: an event split
 across network chunks.
 
 **Retry policy, and the asymmetry in it:** generation falls back to the next
-model on quota or transient errors, but only *before* the first token is
-emitted. Once the reader is looking at a partial answer, restarting elsewhere
+model on quota errors, transient errors, a retired model name (404), or when a
+model sends no first token within 6 s, but only *before* the first token is
+emitted. The 6 s clock exists because a model under load can accept a request
+and then stay silent: on 11 Nov 2026 `gemini-flash-latest` sent nothing for over
+45 s, and with no clock one question took 97 s locally, far past the 30 s route
+limit on Vercel. With it, the same question answered in 4 s. Once the reader is looking at a partial answer, restarting elsewhere
 would duplicate text on screen, so a mid-stream failure is reported instead.
 
 ---

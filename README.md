@@ -98,7 +98,7 @@ the design rather than being worked around.
 | A request cannot run for minutes | Ingest is a resumable state machine, sliced into batches |
 | Nothing survives between requests | Ranking runs in Postgres; the daily quota counter lives in a table |
 | Free-tier embedding quota is 1,000 per day | Embeddings are cached by content hash, so a repeat ingest is nearly free |
-| Free-tier generation quota is per model | Generation falls back through a list of models, but only before the first token |
+| Free-tier generation quota is per model, and a busy model can hang | Generation falls back through four models, on quota, 5xx, a retired name (404) or no first token within 6 s, but only before the first token |
 | Supabase pauses an idle project | A scheduled keep-alive touches the database, with a second scheduler as backup |
 
 ### Ingest as a state machine
@@ -151,7 +151,7 @@ passages the answer was built from on the right.
 
 Next.js 16 (App Router, Turbopack) * TypeScript * Tailwind CSS 4 *
 Supabase (Postgres, pgvector, Auth, RLS) * Gemini
-(`gemini-2.5-flash` for answers, `gemini-embedding-001` at 768 dimensions) *
+(`gemini-2.5-flash` for answers, with 3.6 Flash, Flash Latest and 2.5 Flash Lite behind it, `gemini-embedding-001` at 768 dimensions) *
 Vitest * GitHub Actions.
 
 Gemini is called over its REST API rather than through an SDK. The two things

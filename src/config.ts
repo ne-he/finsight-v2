@@ -27,6 +27,7 @@ export const EMBEDDING_DIM = 768;
  */
 export const CHAT_MODELS = [
   "gemini-2.5-flash",
+  "gemini-3.6-flash",
   "gemini-flash-latest",
   "gemini-2.5-flash-lite",
 ] as const;

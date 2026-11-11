@@ -32,6 +32,29 @@ function isTransient(error: unknown): boolean {
 }
 
 /**
+ * Google retires model names with little notice (2.0 Flash in Oct 2026, 3.5 and
+ * 3.7 Flash soon after). A retired name answers 404, and the next model in the
+ * list is still a better outcome than no answer.
+ */
+function isRetired(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error);
+  return /\b404\b|not found/i.test(text);
+}
+
+/**
+ * How long one model may take to produce its first token before the next one is
+ * tried. Retrieval takes about 3 s and the route is cut at 30 s, so four models
+ * at 6 s each still leave room for the quoted fallback answer.
+ */
+const FIRST_TOKEN_TIMEOUT_MS = 6_000;
+
+/** One line for the server log. Never sent to the browser. */
+function describeRaw(error: unknown): string {
+  const text = error instanceof Error ? error.message : String(error);
+  return text.replace(/\s+/g, " ").slice(0, 160);
+}
+
+/**
  * A short explanation that is safe to show a user.
  *
  * The provider's raw error body can be several kilobytes of JSON and may echo
@@ -135,6 +158,16 @@ export async function* streamAnswer({
   for (let i = 0; i < CHAT_MODELS.length; i++) {
     const model = CHAT_MODELS[i];
     let emitted = false;
+    // A model under load sometimes accepts the request and then sends nothing
+    // for a minute or more (gemini-flash-latest, 11 Nov 2026: no byte in 45 s).
+    // Without a clock the whole request dies at the platform limit with no
+    // answer at all, so a model that has not produced its first token in time
+    // is abandoned for the next one.
+    const controller = new AbortController();
+    const timer = setTimeout(
+      () => controller.abort(new Error(`${model}: no first token, timeout after ${FIRST_TOKEN_TIMEOUT_MS} ms`)),
+      FIRST_TOKEN_TIMEOUT_MS,
+    );
     try {
       const response = await fetch(
         `${API_ROOT}/${model}:streamGenerateContent?alt=sse`,
@@ -145,6 +178,7 @@ export async function* streamAnswer({
             "x-goog-api-key": env().GEMINI_API_KEY,
           },
           body,
+          signal: controller.signal,
         },
       );
 
@@ -167,16 +201,20 @@ export async function* streamAnswer({
           if (payload === "[DONE]") continue;
           const text = extractText(payload);
           if (text) {
+            if (!emitted) clearTimeout(timer);
             emitted = true;
             yield text;
           }
         }
         if (done) break;
       }
+      clearTimeout(timer);
       return;
     } catch (error) {
+      clearTimeout(timer);
       lastError = error;
-      const worthRotating = isQuotaError(error) || isTransient(error);
+      const worthRotating = isQuotaError(error) || isTransient(error) || isRetired(error);
+      if (!emitted) console.warn(`[gemini] ${model} skipped:`, describeRaw(error));
       if (emitted || !worthRotating || i === CHAT_MODELS.length - 1) {
         throw new GenerationFailed(describeFailure(error));
       }
