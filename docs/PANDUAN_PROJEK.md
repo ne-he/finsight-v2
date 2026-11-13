@@ -138,3 +138,44 @@ Kalau tab ditutup di tengah jalan, job berhenti tapi tidak hilang. Ingest juga b
 | Gemini API lewat REST | Embedding dan jawaban | Tanpa SDK karena butuh `outputDimensionality` dan `thinkingConfig`, yang canggung lewat SDK JavaScript. Bundle juga lebih kecil. |
 | `gemini-embedding-001` 768 dimensi | Embedding | Native 3.072 dimensi, dipotong ke 768 supaya kolom vektor ringan untuk free tier. |
 | Vitest dan GitHub Actions | Unit test, CI, keep-alive cadangan | Gratis, offline, dan CI tidak memegang secret production. |
+
+## 6. Angka dan bukti
+
+| Angka | Nilai | Sumber |
+|---|---|---|
+| Korpus | NVDA FY2026, AAPL FY2025, MSFT FY2026, 936 chunk | `README.md`, `evals/results/2026-09-22.md` |
+| Golden set | 22 pertanyaan: 18 bisa dijawab, 4 di luar cakupan | `evals/golden-set.json` |
+| Retrieval hit-rate@6 | 18/18 | `evals/results/2026-09-22.md` |
+| Akurasi gerbang out-of-scope | 4/4 | `evals/results/2026-09-22.md` |
+| False refusal | 0 | `evals/results/2026-09-22.md` |
+| Rata-rata top cosine | 0,7627 | `evals/results/2026-09-22.md` |
+| Rentang cosine pertanyaan valid | 0,707 sampai 0,815 | `evals/results/2026-09-22.md` |
+| Rentang cosine pertanyaan di luar cakupan | 0,472 sampai 0,612, celah 0,095 | `evals/results/2026-09-22.md`, `README.md` |
+| Ambang gerbang | 0,66 (titik tengah celah) | `src/config.ts` |
+| Eval pertama | 13/14, satu gagal di perbandingan pendapatan NVIDIA dan Apple | `evals/results/2026-09-20.md` |
+| Lama ingest | NVDA 362 chunk dalam 404 detik, AAPL 220 dalam 237 detik, MSFT 354 dalam 361 detik | `README.md` |
+| Latensi sebelum dan sesudah fix | 97 detik menjadi 4 detik untuk pertanyaan yang sama | `docs/ARCHITECTURE.md` bagian 6, commit `0b7d52f` |
+| Unit test | 91 lolos, 11 file | folder `tests/` (hitungan `it(` per file) |
+| Pertanyaan bahasa Indonesia | 2 dari 2 diarahkan ke laporan yang benar | `evals/results/2026-09-22.md` (`id-nvda-risk`, `id-aapl-segments`) |
+
+Cara membaca angka ini dengan jujur: semuanya mengukur **retrieval**, yaitu apakah potongan yang benar masuk ke 6 teratas dan apakah pertanyaan ngawur ditolak. Kualitas jawaban yang ditulis Gemini (faithfulness) belum pernah diukur. Golden set 22 pertanyaan juga kecil, jadi 18/18 artinya "lolos uji yang ada", bukan "sempurna".
+
+## 7. Keputusan desain penting
+
+**Satu deployment, bukan frontend dan backend terpisah.** Pilihan lain adalah tetap memakai engine Python v1 di belakang frontend Next.js. Itu menyelamatkan engine yang sudah terukur, tapi mengembalikan masalah hosting yang justru mau dihilangkan. Trade-off-nya: setiap jawaban harus selesai di bawah 30 detik.
+
+**Ranking pindah ke dalam Postgres.** v1 menyimpan seluruh index di memori proses, sesuatu yang tidak mungkin di serverless. Jadi fusi dense dan sparse dipindah ke fungsi SQL `fs_match_chunks`. Untungnya, filter perusahaan diterapkan di dalam ranking, jadi hasil tidak pernah kurang dari k. Ruginya: lengan kata kunci memakai `ts_rank_cd`, bukan BM25, tidak ada reranker, dan logika SQL lebih susah di-unit-test.
+
+**Ambang 0,66 hasil ukur, bukan warisan.** v1 memakai 0,68. Setelah MSFT masuk, pertanyaan valid terendah (perbandingan tiga perusahaan) mencetak 0,707, hanya 0,027 di atas 0,68. Ambang dipindah ke titik tengah celah antara 0,612 dan 0,707 supaya margin di kedua sisi seimbang.
+
+**Satu pencarian per perusahaan untuk perbandingan.** Satu pencarian atas dua laporan dimenangkan laporan yang kebetulan memakai kata paling mirip. Menaikkan k tidak menolong karena laporan dominan ikut mengambil slot tambahan. Biayanya n kali round trip ke database, hanya untuk pertanyaan perbandingan, tanpa embedding tambahan.
+
+**Fallback model hanya sebelum token pertama.** Kalau model diganti setelah user melihat separuh jawaban, teks di layar akan dobel. Jadi kegagalan di tengah jalan dilaporkan sebagai jawaban terpotong, bukan diulang diam-diam.
+
+**Jawaban darurat berupa kutipan.** Retrieval tidak bergantung pada Gemini untuk generasi. Kalau Gemini mati, potongan yang benar sudah ditemukan, jadi lebih baik ditampilkan sebagai kutipan berlabel daripada layar kosong. Kegagalan yang dicegah ini pernah terjadi di v1: sitasi muncul, lalu tidak ada apa-apa lagi selamanya.
+
+**Ingest digerakkan browser admin, bukan cron.** Cron di Vercel Hobby hanya sekali sehari, jadi satu ingest akan makan berminggu-minggu. Loop dari browser tidak butuh jaminan apa pun dari platform dan memberi progress bar sungguhan. Trade-off-nya, admin harus membiarkan tab terbuka.
+
+**Kuota dan peran di database.** Penghitung di memori akan reset setiap kali Vercel mengganti instance, jadi kuota disimpan di tabel dan dinaikkan plus dicek dalam satu statement. Peran admin tidak bisa ditulis dari klien. Akun pertama yang mendaftar otomatis jadi admin (migrasi 0005), dengan lock tabel supaya dua pendaftaran bersamaan tidak sama-sama jadi admin.
+
+**Mode tamu tanpa menyimpan IP.** ID pengunjung adalah HMAC dari tanggal UTC dan IP, dengan kunci yang hanya ada di server. ID tidak bisa dibalik jadi IP, dan karena tanggal ikut di-hash, pengunjung yang sama tidak bisa dihubungkan dari hari ke hari.
