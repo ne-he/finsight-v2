@@ -283,3 +283,34 @@ Ingest yang butuh menit dipecah jadi mesin status, 12 chunk per request, dan loo
 
 **8. Apa yang akan kamu kerjakan berikutnya?**
 Mengukur faithfulness jawaban dengan LLM judge, memperbesar golden set, dan menulis threat model untuk prompt injection.
+
+## 12. Kamus istilah
+
+| Istilah | Arti sederhana |
+|---|---|
+| 10-K | Laporan tahunan wajib perusahaan publik AS ke SEC, isinya bisnis, risiko, dan keuangan. |
+| SEC EDGAR | Situs resmi SEC tempat semua laporan perusahaan publik bisa diunduh gratis. |
+| Item (10-K) | Bab baku dalam 10-K, misalnya Item 1A Risk Factors atau Item 7 MD&A. |
+| RAG | Retrieval-augmented generation: cari dokumen relevan dulu, baru suruh model bahasa menjawab dari dokumen itu. |
+| Chunk | Potongan teks kecil (di sini sekitar 1.200 karakter) yang jadi satuan pencarian. |
+| Overlap | Bagian ujung chunk sebelumnya yang diulang di chunk berikutnya supaya fakta di perbatasan tidak terpotong. |
+| Embedding | Deretan angka yang mewakili makna teks. Teks bermakna mirip punya embedding berdekatan. |
+| Cosine similarity | Ukuran kemiripan dua embedding, makin dekat ke 1 makin mirip. |
+| pgvector | Ekstensi Postgres untuk menyimpan dan mencari embedding. |
+| HNSW | Struktur index yang membuat pencarian vektor cepat tanpa membandingkan semua baris. |
+| Full-text search | Pencarian berbasis kata kunci bawaan Postgres. |
+| RRF | Reciprocal Rank Fusion: cara menggabungkan dua daftar peringkat dengan menjumlahkan `1/(60 + peringkat)`. |
+| BM25 | Rumus skor kata kunci klasik yang dipakai v1. v2 memakai `ts_rank_cd` milik Postgres. |
+| Reranker | Model tambahan yang mengurutkan ulang hasil pencarian. Tidak dipakai di v2. |
+| Gerbang keyakinan | Aturan yang menolak menjawab kalau kemiripan terbaik di bawah 0,66. |
+| Golden set | Kumpulan pertanyaan uji dengan jawaban yang diharapkan, untuk mengukur kualitas. |
+| Hit-rate@6 | Persentase pertanyaan yang dokumen benarnya masuk 6 hasil teratas. |
+| False refusal | Sistem menolak pertanyaan yang sebenarnya bisa dijawab. |
+| Faithfulness | Seberapa setia jawaban model pada dokumen sumbernya. Belum diukur di projek ini. |
+| Streaming / SSE | Jawaban dikirim sedikit demi sedikit lewat Server-Sent Events, jadi teks muncul bertahap. |
+| Fallback | Pindah ke model cadangan kalau model utama gagal. |
+| Serverless | Kode jalan per request tanpa server yang hidup terus, ada batas waktu dan tidak ada memori antar request. |
+| RLS | Row Level Security: aturan di database yang membatasi baris mana yang boleh dibaca tiap user. |
+| Service role key | Kunci server Supabase yang melewati RLS. Tidak boleh sampai ke browser. |
+| HMAC | Hash dengan kunci rahasia. Dipakai untuk membuat ID tamu yang tidak bisa dibalik jadi IP. |
+| Migrasi | File SQL bernomor yang mengubah struktur database secara berurutan. |
