@@ -208,3 +208,42 @@ Cara membaca angka ini dengan jujur: semuanya mengukur **retrieval**, yaitu apak
 - **Satu tahun per perusahaan.** Skema mendukung banyak tahun, tapi alur ingest hanya mengambil 10-K terbaru.
 - **Free tier rapuh.** Kuota Gemini per model kecil, dan nama model bisa dipensiunkan Google sewaktu-waktu. Rantai fallback mengurangi risikonya, tidak menghapusnya.
 - **Kapasitas penyimpanan Supabase** belum dicek `[?]` (masih tercatat sebagai pertanyaan terbuka di `docs/ARCHITECTURE.md` bagian 9).
+
+## 10. Cara menjalankan dan deploy
+
+Persiapan lokal:
+
+```bash
+npm install
+cp .env.example .env.local
+```
+
+Isi `.env.local` dengan variabel berikut (nilainya jangan pernah di-commit):
+
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (hanya server, juga dipakai sebagai kunci HMAC tamu)
+- `GEMINI_API_KEY`
+- `EDGAR_USER_AGENT` (SEC mewajibkan User-Agent berisi kontak)
+- Opsional: `DAILY_LIMIT_PER_USER` (default 40), `DAILY_LIMIT_GLOBAL` (400), `GUEST_LIMIT_PER_VISITOR` (5), `GUEST_LIMIT_DAILY` (80), `CRON_SECRET`
+
+Jalankan SQL di `supabase/migrations/` berurutan dari 0001 lewat SQL editor Supabase, lalu:
+
+```bash
+npm run verify
+npm run dev
+```
+
+Akun pertama yang mendaftar otomatis jadi admin. Perintah harian lain:
+
+| Perintah | Fungsi |
+|---|---|
+| `npm run inspect -- NVDA` | Parse laporan asli dan laporkan section serta chunk, tanpa memakai kuota |
+| `npm run ingest -- NVDA AAPL` | Ingest dari terminal |
+| `npm run eval -- --write` | Ukur retrieval dan tulis laporan bertanggal ke `evals/results/` |
+| `npm test` | 91 unit test, offline |
+| `npm run typecheck`, `npm run lint`, `npm run build` | Pengecekan yang sama dengan CI |
+| `npm run promote -- email` | Jadikan akun lain admin |
+
+Deploy: app berjalan di Vercel dengan environment variable yang sama diisi di dashboard Vercel. Cara deploy dipicu (otomatis dari push ke `main` atau manual) tidak tercatat di repo `[?]`. Cron Vercel memanggil `/api/keep-alive` setiap hari jam 06.00 UTC (`vercel.json`), dan GitHub Actions `keep-alive.yml` jadi cadangan setiap 3 hari jam 07.00 UTC dengan secret `APP_URL` dan `CRON_SECRET`. Ini perlu karena Supabase free tier menidurkan project setelah sekitar tujuh hari tanpa aktivitas.
+
+Untuk menyalakan mode tamu: jalankan isi `supabase/migrations/0006_guest_usage.sql` di SQL editor Supabase. Status ketersediaan di-cache 5 menit per instance, jadi tombol bisa butuh beberapa menit untuk muncul.
