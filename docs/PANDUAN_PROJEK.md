@@ -247,3 +247,39 @@ Akun pertama yang mendaftar otomatis jadi admin. Perintah harian lain:
 Deploy: app berjalan di Vercel dengan environment variable yang sama diisi di dashboard Vercel. Cara deploy dipicu (otomatis dari push ke `main` atau manual) tidak tercatat di repo `[?]`. Cron Vercel memanggil `/api/keep-alive` setiap hari jam 06.00 UTC (`vercel.json`), dan GitHub Actions `keep-alive.yml` jadi cadangan setiap 3 hari jam 07.00 UTC dengan secret `APP_URL` dan `CRON_SECRET`. Ini perlu karena Supabase free tier menidurkan project setelah sekitar tujuh hari tanpa aktivitas.
 
 Untuk menyalakan mode tamu: jalankan isi `supabase/migrations/0006_guest_usage.sql` di SQL editor Supabase. Status ketersediaan di-cache 5 menit per instance, jadi tombol bisa butuh beberapa menit untuk muncul.
+
+## 11. Cara menjelaskan ke rekruter
+
+### Pitch 30 detik (Indonesia)
+
+"FinSight itu sistem tanya jawab atas laporan tahunan 10-K perusahaan publik AS. Bedanya dengan chatbot biasa, jawabannya hanya boleh dari teks laporan, tiap klaim punya sitasi yang bisa diklik ke paragraf sumbernya, dan kalau laporannya tidak memuat jawaban, sistem menolak. Saya tulis ulang dari versi Python jadi satu app Next.js di Vercel dengan Supabase pgvector, pencarian hybrid vektor plus kata kunci yang digabung dengan RRF di dalam SQL. Retrieval-nya saya ukur pakai golden set: 18 dari 18 pertanyaan dapat dokumen yang benar, 4 dari 4 pertanyaan di luar cakupan ditolak, dan ambang penolakannya saya pilih dari data, bukan tebakan."
+
+### Pitch 30 detik (English)
+
+"FinSight is a question answering system over SEC 10-K annual reports. Unlike a chatbot, it answers only from the filing text, every claim carries a clickable citation back to the source passage, and it refuses when the filings do not support an answer. I rewrote it from a Python service into a single Next.js app on Vercel, with Supabase pgvector and hybrid vector plus keyword search fused by RRF inside SQL. I measured retrieval on a golden set: 18 of 18 answerable questions retrieve the right filing, 4 of 4 out-of-scope questions are refused, and the refusal threshold was chosen from that data rather than guessed."
+
+### Pertanyaan yang mungkin ditanya
+
+**1. Kenapa tidak langsung pakai ChatGPT atau Gemini saja?**
+Model umum menjawab dari ingatan yang bisa basi dan tidak bisa menunjukkan sumbernya. Di domain keuangan, angka yang salah tapi meyakinkan lebih berbahaya daripada tidak ada jawaban. FinSight memaksa jawaban berasal dari potongan laporan dan menampilkan potongan itu di samping jawaban.
+
+**2. Kenapa hybrid search, bukan vektor saja?**
+Vektor bagus menangkap parafrase, tapi lemah untuk istilah persis seperti nama segmen atau istilah akuntansi. Full-text search kebalikannya. Keduanya digabung dengan Reciprocal Rank Fusion di dalam satu fungsi SQL, jadi cukup satu round trip ke database.
+
+**3. Bagaimana kamu mencegah halusinasi?**
+Tiga lapis. Gerbang keyakinan menolak kalau cosine terbaik di bawah 0,66. System prompt melarang mengarang atau membulatkan angka dan mewajibkan sitasi. Panel bukti membuat pembaca bisa mengecek sendiri. Saya juga terus terang bahwa faithfulness jawaban belum diukur, baru retrieval.
+
+**4. Dari mana angka 0,66?**
+Dari eval. Pertanyaan valid mencetak 0,707 sampai 0,815, pertanyaan di luar cakupan 0,472 sampai 0,612. Ambang lama 0,68 hanya menyisakan margin 0,027 di atas pertanyaan valid terendah, jadi saya pindahkan ke titik tengah celah.
+
+**5. Ceritakan bug paling menarik yang kamu perbaiki.**
+Pertanyaan perbandingan NVIDIA dan Apple mengembalikan 6 chunk NVIDIA dan nol Apple, karena satu pencarian dimenangkan laporan yang kata-katanya paling mirip. Solusinya satu pencarian per perusahaan lalu diselang-seling. Yang kedua bug latensi: satu model Gemini menerima request lalu diam 45 detik lebih, jadi satu pertanyaan makan 97 detik. Saya tambahkan batas 6 detik untuk token pertama, dan pertanyaan yang sama jadi 4 detik.
+
+**6. Kenapa ditulis ulang dari Python ke Next.js?**
+Versi Python butuh server yang hidup terus, dan semua opsi gratis waktu itu menyisakan masalah kartu kredit atau batas plan. Rewrite menghilangkan masalah hosting, dengan biaya semua angka v1 tidak lagi berlaku sebagai bukti, jadi semuanya saya ukur ulang.
+
+**7. Bagaimana menangani batasan serverless?**
+Ingest yang butuh menit dipecah jadi mesin status, 12 chunk per request, dan loop-nya digerakkan browser admin. Kuota disimpan di database karena memori serverless tidak bertahan. Embedding di-cache berdasarkan hash supaya ingest ulang hampir gratis.
+
+**8. Apa yang akan kamu kerjakan berikutnya?**
+Mengukur faithfulness jawaban dengan LLM judge, memperbesar golden set, dan menulis threat model untuk prompt injection.
