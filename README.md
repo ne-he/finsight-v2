@@ -11,9 +11,9 @@ conversation history and vector search.
 
 **Live: <https://finsight-v2-nine.vercel.app>**
 
-> **Status: deployed and answering.** Try it without an account (a few
-> questions a day, nothing saved), or sign in for history. Ask, history and
-> admin ingest all run against a live database. Retrieval quality is measured on this
+> **Status: deployed and answering.** Sign in, ask, history and admin ingest all
+> run against a live database. Guest mode (a few questions a day without an
+> account, nothing saved) is built and waits on one database migration. Retrieval quality is measured on this
 > implementation, not inherited. See [What is not done yet](#what-is-not-done-yet).
 
 ---
