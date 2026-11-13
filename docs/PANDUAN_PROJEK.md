@@ -97,3 +97,44 @@ queued -> fetching -> chunking -> embedding -> ready
 5. Setelah semua chunk punya embedding, status jadi `ready` dan laporan muncul di pencarian.
 
 Kalau tab ditutup di tengah jalan, job berhenti tapi tidak hilang. Ingest juga bisa dijalankan dari terminal dengan `npm run ingest -- NVDA AAPL`.
+
+## 4. Peta kode: folder dan file penting
+
+| Path | Isinya apa |
+|---|---|
+| `src/config.ts` | Semua angka tuning: model, dimensi 768, chunk 1.200/200, k = 6, RRF 60, ambang 0,66, batch ingest 12. Tidak ada secret. |
+| `src/lib/env.ts` | Validasi environment variable dengan zod, semua nilai di-trim. |
+| `src/lib/gemini.ts` | Embedding dan streaming jawaban lewat REST, rantai fallback 4 model, batas 6 detik token pertama, pesan error yang aman untuk user. |
+| `src/lib/answer-stream.ts` | Validasi pertanyaan, retrieval, streaming SSE, jawaban darurat, penyimpanan. Dipakai bersama oleh jalur login dan tamu. |
+| `src/lib/guest.ts` | Ambil IP klien, bikin ID pengunjung dengan HMAC harian, cek apakah migrasi 0006 sudah jalan. |
+| `src/lib/rag/retrieve.ts` | Orkestrasi pencarian, pencarian per perusahaan, gerbang keyakinan, pengelompokan sumber. |
+| `src/lib/rag/filters.ts` | Deteksi perusahaan dan tahun dari teks pertanyaan. |
+| `src/lib/rag/balance.ts` | Penggabungan bergiliran untuk pertanyaan perbandingan. |
+| `src/lib/rag/sections.ts` | Deteksi batas Item 10-K, membuang entri daftar isi dan header halaman berulang. |
+| `src/lib/rag/chunking.ts` | Pemotongan per paragraf dengan overlap, ID chunk deterministik. |
+| `src/lib/rag/edgar.ts` | Ambil 10-K dari SEC EDGAR dan ubah HTML jadi teks. |
+| `src/lib/rag/prompt.ts` | System prompt, pembungkus konteks, format sitasi, jawaban darurat. |
+| `src/lib/ingest.ts` | Mesin status ingest dan cache embedding. |
+| `src/lib/sse.ts` | Parser SSE yang tahan event terpotong antar paket jaringan. |
+| `src/app/api/chat/route.ts`, `src/app/api/guest/chat/route.ts` | Endpoint tanya untuk user login dan untuk tamu. |
+| `src/app/api/admin/ingest/` | Endpoint `start` dan `step` untuk ingest, khusus admin. |
+| `src/app/api/keep-alive/route.ts` | Ping database supaya Supabase tidak tertidur. Tidak memanggil Gemini. |
+| `src/components/chat-view.tsx`, `src/components/chat/` | Layar chat, panel bukti, dan meter kecocokan. |
+| `supabase/migrations/` | 0001 skema, 0002 RLS, 0003 fungsi pencarian, 0004 batas harian, 0005 admin pertama, 0006 kuota tamu. |
+| `scripts/` | `verify-setup`, `inspect-filing`, `ingest`, `run-eval`, `promote-admin`. |
+| `evals/golden-set.json` | 22 pertanyaan uji dengan perusahaan yang diharapkan. |
+| `evals/results/` | Laporan eval bertanggal 20, 21, dan 22 Sep 2026. |
+| `tests/` | 11 file Vitest, total 91 test, semua offline. |
+| `.github/workflows/` | `ci.yml` (test, typecheck, lint, build) dan `keep-alive.yml`. |
+
+## 5. Teknologi yang dipakai dan kenapa
+
+| Teknologi | Dipakai untuk | Kenapa ini |
+|---|---|---|
+| Next.js 16 App Router | Halaman dan API dalam satu deployment | Tidak perlu backend terpisah, tidak ada CORS, satu tempat deploy. |
+| Vercel (Hobby) | Hosting | Gratis tanpa kartu, sudah terbukti di projek lain. Route dibatasi `maxDuration = 30`. |
+| Supabase Postgres + pgvector | Vektor, full-text, riwayat chat, kuota | Pencarian vektor dan relasional di satu database. Pakai project yang sama dengan app Ask Nemi karena slot free tier sudah penuh, semua objek berawalan `fs_`. |
+| Supabase Auth + RLS | Login dan isolasi data | Browser memegang anon key, jadi RLS memastikan user tidak bisa membaca percakapan orang lain walaupun ada route yang lupa cek. |
+| Gemini API lewat REST | Embedding dan jawaban | Tanpa SDK karena butuh `outputDimensionality` dan `thinkingConfig`, yang canggung lewat SDK JavaScript. Bundle juga lebih kecil. |
+| `gemini-embedding-001` 768 dimensi | Embedding | Native 3.072 dimensi, dipotong ke 768 supaya kolom vektor ringan untuk free tier. |
+| Vitest dan GitHub Actions | Unit test, CI, keep-alive cadangan | Gratis, offline, dan CI tidak memegang secret production. |
