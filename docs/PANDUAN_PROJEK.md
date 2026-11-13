@@ -179,3 +179,32 @@ Cara membaca angka ini dengan jujur: semuanya mengukur **retrieval**, yaitu apak
 **Kuota dan peran di database.** Penghitung di memori akan reset setiap kali Vercel mengganti instance, jadi kuota disimpan di tabel dan dinaikkan plus dicek dalam satu statement. Peran admin tidak bisa ditulis dari klien. Akun pertama yang mendaftar otomatis jadi admin (migrasi 0005), dengan lock tabel supaya dua pendaftaran bersamaan tidak sama-sama jadi admin.
 
 **Mode tamu tanpa menyimpan IP.** ID pengunjung adalah HMAC dari tanggal UTC dan IP, dengan kunci yang hanya ada di server. ID tidak bisa dibalik jadi IP, dan karena tanggal ikut di-hash, pengunjung yang sama tidak bisa dihubungkan dari hari ke hari.
+
+## 8. Update terbaru
+
+**20 Sep 2026.** Rewrite dimulai. Inti retrieval, skema, API route, antarmuka minimal, skrip setup, ingest dari terminal, dan harness eval masuk dalam satu hari. Eval pertama: 13/14 dengan dua laporan.
+
+**21 Sep 2026.** Bug perbandingan diperbaiki dengan pencarian per perusahaan (`023da71`). Jawaban mulai di-parse jadi paragraf, list, dan tag sitasi.
+
+**22 Sep 2026.** MSFT dan perbandingan tiga perusahaan masuk golden set (`ddb5eac`). Ambang diturunkan ke 0,66 berdasarkan celah terukur (`4ae1ea8`).
+
+**23 Sep 2026.** Desain "kertas dan tinta" dan panel bukti dibangun, app di-deploy ke URL publik. Batas fungsi Vercel Hobby dipastikan 300 detik dengan fluid compute, tapi route sengaja tetap 30 detik.
+
+**12 Okt 2026.** Next.js naik ke 16.3.8 untuk menutup advisory RCE di `next/og` dan SSRF di image optimizer (`3c9961a`).
+
+**11 Nov 2026, bug latensi.** Satu pertanyaan sempat makan 97 detik di lokal. Penyebabnya: `gemini-2.5-flash` membalas 503, lalu `gemini-flash-latest` menerima request tapi diam lebih dari 45 detik. Di Vercel, route dipotong di 30 detik, jadi user tidak dapat jawaban apa pun. Fix di commit `0b7d52f`: tiap model diberi 6 detik untuk mengeluarkan token pertama sebelum pindah ke model berikutnya, dan model yang membalas 404 karena dipensiunkan juga dilewati. Rantainya `gemini-2.5-flash`, `gemini-3.6-flash`, `gemini-flash-latest`, `gemini-2.5-flash-lite`. Setelah fix, pertanyaan yang sama selesai 4 detik. Perilaku ini dikunci oleh `tests/gemini-fallback.test.ts`: model yang diam ditinggal, model 404 dilewati, API key salah tidak dicoba ulang.
+
+**11 Nov 2026, mode tamu.** Commit `42268ef` menambah halaman `/try`. Pengunjung bisa bertanya tanpa akun, 5 pertanyaan per pengunjung per hari dan 80 total tamu per hari (diatur lewat `GUEST_LIMIT_PER_VISITOR` dan `GUEST_LIMIT_DAILY`). Hitungan dilakukan di database lewat `fs_bump_guest_usage`, ikut menambah batas global, dan tidak ada percakapan yang disimpan. Riwayat chat tamu dibatasi 12 pesan. Retrieval dan streaming dipindah ke `src/lib/answer-stream.ts` supaya jalur tamu dan login memakai pipeline yang identik. SQL migrasi sudah diuji di Postgres (PGlite). Kode sudah live, tapi tombolnya **masih tersembunyi** karena `guestModeAvailable()` mengecek tabel `fs_guest_usage`, dan migrasi `0006_guest_usage.sql` sengaja belum dijalankan di Supabase.
+
+**11 Nov 2026, keamanan.** Next.js naik ke 16.4.6 (`f93c520`) karena advisory critical di rentang 16.0.0 sampai 16.4.0. Semua 91 unit test lolos, CI hijau, deploy Vercel sukses.
+
+## 9. Batasan jujur dan yang belum dikerjakan
+
+- **Faithfulness jawaban belum diukur.** Retrieval terukur, tapi belum ada bukti seberapa sering Gemini menulis klaim yang tidak didukung potongannya. Menilainya butuh LLM judge dan kuota generasi yang tidak cukup dalam satu hari di free tier.
+- **Golden set kecil.** 22 pertanyaan, 3 perusahaan. Cukup untuk menangkap regresi besar, belum cukup untuk klaim statistik.
+- **Tidak ada integration test ke database live.** Unit test hanya menutup logika murni. Jalur database dicek manual lewat `npm run verify` dan eval.
+- **Prompt injection belum dimitigasi.** Teks dari SEC masuk ke konteks model. Sumbernya berisiko rendah, tapi system prompt bukan batas keamanan.
+- **Tidak ada reranker.** Kualitas urutan bergantung penuh pada RRF dense plus `ts_rank_cd`.
+- **Satu tahun per perusahaan.** Skema mendukung banyak tahun, tapi alur ingest hanya mengambil 10-K terbaru.
+- **Free tier rapuh.** Kuota Gemini per model kecil, dan nama model bisa dipensiunkan Google sewaktu-waktu. Rantai fallback mengurangi risikonya, tidak menghapusnya.
+- **Kapasitas penyimpanan Supabase** belum dicek `[?]` (masih tercatat sebagai pertanyaan terbuka di `docs/ARCHITECTURE.md` bagian 9).
