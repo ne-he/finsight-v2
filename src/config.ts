@@ -24,9 +24,13 @@ export const EMBEDDING_DIM = 768;
 /**
  * Answer generation, in preference order. Free-tier quota is per-model, so a
  * single exhausted model would otherwise take the whole app down for the day.
+ *
+ * 3.5 Flash-Lite leads since 27 Nov 2026: Google shuts gemini-2.5-flash down on
+ * 1 Dec 2026 and routes its calls to 3.5 Flash-Lite from then on. That model
+ * refuses thinkingBudget with a 400, so `src/lib/gemini.ts` never sends it one.
  */
 export const CHAT_MODELS = [
-  "gemini-2.5-flash",
+  "gemini-3.5-flash-lite",
   "gemini-3.6-flash",
   "gemini-flash-latest",
   "gemini-2.5-flash-lite",

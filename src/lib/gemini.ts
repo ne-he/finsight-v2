@@ -42,6 +42,32 @@ function isRetired(error: unknown): boolean {
 }
 
 /**
+ * Google answers a bad API key with a 400 too ("API key not valid"). The key is
+ * the same for every model, so that one is never retried or rotated.
+ */
+function isKeyError(text: string): boolean {
+  return /api.?key|API_KEY_INVALID/i.test(text);
+}
+
+/**
+ * One model refusing the request shape (HTTP 400). Refusals can be per model:
+ * 3.5 Flash-Lite rejects thinkingBudget, which 3.6 Flash accepts, so the next
+ * model may well take the same request.
+ */
+function isBadRequest(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error);
+  return /streamGenerateContent 400:|INVALID_ARGUMENT/.test(text) && !isKeyError(text);
+}
+
+/**
+ * Models that answer 400 INVALID_ARGUMENT whenever thinkingBudget is present
+ * (probed 10 and 27 Nov 2026). They do not think by default, so they get no
+ * thinkingConfig at all. A model that refuses it at runtime joins this set and
+ * is asked once more without it.
+ */
+const NO_THINKING_BUDGET = new Set<string>(["gemini-3.5-flash-lite", "gemini-flash-lite-latest"]);
+
+/**
  * How long one model may take to produce its first token before the next one is
  * tried. Retrieval takes about 3 s and the route is cut at 30 s, so four models
  * at 6 s each still leave room for the quoted fallback answer.
@@ -141,17 +167,23 @@ export async function* streamAnswer({
   history,
   prompt,
 }: StreamParams): AsyncGenerator<string> {
-  const body = JSON.stringify({
+  const base = {
     systemInstruction: { parts: [{ text: systemInstruction }] },
     contents: [
       ...history.map((turn) => ({ role: turn.role, parts: [{ text: turn.text }] })),
       { role: "user", parts: [{ text: prompt }] },
     ],
-    // This model reasons before answering by default, which adds seconds of
-    // first-token latency. The answer here only synthesises context that
-    // retrieval already found, so that budget buys nothing.
-    generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
-  });
+  };
+  // Flash models reason before answering by default, which adds seconds of
+  // first-token latency. The answer here only synthesises context that
+  // retrieval already found, so that budget buys nothing. Models in
+  // NO_THINKING_BUDGET refuse the field and get none.
+  const bodyFor = (model: string) =>
+    JSON.stringify(
+      NO_THINKING_BUDGET.has(model)
+        ? base
+        : { ...base, generationConfig: { thinkingConfig: { thinkingBudget: 0 } } },
+    );
 
   let lastError: unknown = new GenerationFailed("No model was attempted.");
 
@@ -169,18 +201,26 @@ export async function* streamAnswer({
       FIRST_TOKEN_TIMEOUT_MS,
     );
     try {
-      const response = await fetch(
-        `${API_ROOT}/${model}:streamGenerateContent?alt=sse`,
-        {
+      const send = () =>
+        fetch(`${API_ROOT}/${model}:streamGenerateContent?alt=sse`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "x-goog-api-key": env().GEMINI_API_KEY,
           },
-          body,
+          body: bodyFor(model),
           signal: controller.signal,
-        },
-      );
+        });
+
+      let response = await send();
+      // A model that refuses thinkingBudget is asked once more without it.
+      if (response.status === 400 && !NO_THINKING_BUDGET.has(model)) {
+        const detail = (await response.text()).slice(0, 200);
+        if (isKeyError(detail)) throw new Error(`streamGenerateContent 400: ${detail}`);
+        NO_THINKING_BUDGET.add(model);
+        console.warn(`[gemini] ${model} refused thinkingBudget, retrying without it`);
+        response = await send();
+      }
 
       if (!response.ok || !response.body) {
         const detail = response.body ? (await response.text()).slice(0, 200) : "no body";
@@ -213,7 +253,8 @@ export async function* streamAnswer({
     } catch (error) {
       clearTimeout(timer);
       lastError = error;
-      const worthRotating = isQuotaError(error) || isTransient(error) || isRetired(error);
+      const worthRotating =
+        isQuotaError(error) || isTransient(error) || isRetired(error) || isBadRequest(error);
       if (!emitted) console.warn(`[gemini] ${model} skipped:`, describeRaw(error));
       if (emitted || !worthRotating || i === CHAT_MODELS.length - 1) {
         throw new GenerationFailed(describeFailure(error));

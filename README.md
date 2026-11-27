@@ -157,7 +157,7 @@ passages the answer was built from on the right.
 
 Next.js 16 (App Router, Turbopack) * TypeScript * Tailwind CSS 4 *
 Supabase (Postgres, pgvector, Auth, RLS) * Gemini
-(`gemini-2.5-flash` for answers, with 3.6 Flash, Flash Latest and 2.5 Flash Lite behind it, `gemini-embedding-001` at 768 dimensions) *
+(`gemini-3.5-flash-lite` for answers, with 3.6 Flash, Flash Latest and 2.5 Flash Lite behind it, `gemini-embedding-001` at 768 dimensions) *
 Vitest * GitHub Actions.
 
 Gemini is called over its REST API rather than through an SDK. The two things

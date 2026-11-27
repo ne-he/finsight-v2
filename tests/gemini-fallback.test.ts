@@ -14,6 +14,8 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  // gemini.ts remembers which models refused thinkingBudget, so each test gets a fresh module.
+  vi.resetModules();
 });
 
 function sseResponse(text: string): Response {
@@ -64,6 +66,30 @@ describe("streamAnswer model fallback", () => {
     const { streamAnswer } = await import("@/lib/gemini");
     await expect(collect(streamAnswer({ systemInstruction: "s", history: [], prompt: "p" }))).resolves.toBe("ok");
     expect(n).toBe(2);
+  });
+
+  it("never sends thinkingBudget to 3.5 Flash-Lite, retries a refusing model without it, and rotates on 400", async () => {
+    // 27 Nov 2026: gemini-3.5-flash-lite answers 400 INVALID_ARGUMENT to any thinkingBudget.
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const calls: { model: string; thinking: boolean }[] = [];
+    vi.stubGlobal("fetch", (url: string, init?: RequestInit) => {
+      const model = url.split("/models/")[1].split(":")[0];
+      const thinking = String(init?.body).includes("thinkingConfig");
+      calls.push({ model, thinking });
+      if (model === "gemini-3.6-flash" && !thinking) return Promise.resolve(sseResponse("ok"));
+      return Promise.resolve(
+        new Response('{"error":{"code":400,"status":"INVALID_ARGUMENT"}}', { status: 400 }),
+      );
+    });
+
+    const { streamAnswer } = await import("@/lib/gemini");
+    await expect(collect(streamAnswer({ systemInstruction: "s", history: [], prompt: "p" }))).resolves.toBe("ok");
+    expect(CHAT_MODELS.slice(0, 2)).toEqual(["gemini-3.5-flash-lite", "gemini-3.6-flash"]);
+    expect(calls).toEqual([
+      { model: "gemini-3.5-flash-lite", thinking: false },
+      { model: "gemini-3.6-flash", thinking: true },
+      { model: "gemini-3.6-flash", thinking: false },
+    ]);
   });
 
   it("does not retry a bad API key", async () => {
